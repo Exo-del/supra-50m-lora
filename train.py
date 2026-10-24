@@ -32,6 +32,17 @@ OUT_DIR = ROOT / "lora_out"
 TARGET_MODULES = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
 
 
+def load_base(dtype):
+    """Load the base model, tolerating old `torch_dtype` vs new `dtype` kwarg."""
+    from transformers import AutoModelForCausalLM
+
+    kw = dict(low_cpu_mem_usage=True)
+    try:
+        return AutoModelForCausalLM.from_pretrained(MODEL_DIR, dtype=dtype, **kw)
+    except TypeError:
+        return AutoModelForCausalLM.from_pretrained(MODEL_DIR, torch_dtype=dtype, **kw)
+
+
 def pick_device(requested: str = "auto"):
     """Return (device, dtype, needs_scaler) for CUDA / CPU."""
     import torch
@@ -146,7 +157,7 @@ def train(args) -> None:
 
     tok = AutoTokenizer.from_pretrained(MODEL_DIR)
     tok.padding_side = "right"
-    model = AutoModelForCausalLM.from_pretrained(MODEL_DIR, dtype=dtype, low_cpu_mem_usage=True)
+    model = load_base(dtype)
     model.config.use_cache = False
     model.to(device)
 
@@ -284,7 +295,7 @@ def sample(prompt: str, adapter: Path | None = None, max_new_tokens: int = 80) -
 
     device, dtype, _ = pick_device()
     tok = AutoTokenizer.from_pretrained(MODEL_DIR)
-    model = AutoModelForCausalLM.from_pretrained(MODEL_DIR, dtype=dtype).to(device)
+    model = load_base(dtype).to(device)
 
     if adapter and adapter.exists():
         from peft import PeftModel
