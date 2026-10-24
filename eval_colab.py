@@ -49,6 +49,10 @@ def main() -> None:
     ap.add_argument("--data", default="data/mix_colab.jsonl")
     ap.add_argument("--per-source", type=int, default=40)
     ap.add_argument("--max-seq", type=int, default=1024)
+    ap.add_argument("--samples", type=int, default=3, help="generations per probe")
+    ap.add_argument("--max-new-tokens", type=int, default=160,
+                    help="tool calls appear after the preamble; keep this generous")
+    ap.add_argument("--greedy", action="store_true", help="deterministic decoding")
     args = ap.parse_args()
 
     import torch
@@ -134,25 +138,31 @@ def main() -> None:
         ),
     ]
 
-    def gen(model, prompt, n=50):
+    def gen(model, prompt, n):
         ids = tok(prompt, return_tensors="pt").input_ids.to(device)
         with torch.no_grad():
             out = model.generate(
                 ids,
                 max_new_tokens=n,
-                do_sample=True,
-                temperature=0.5,
-                top_k=25,
-                top_p=0.9,
+                do_sample=not args.greedy,
+                temperature=0.5 if not args.greedy else None,
+                top_k=25 if not args.greedy else None,
+                top_p=0.9 if not args.greedy else None,
                 repetition_penalty=1.2,
                 pad_token_id=tok.pad_token_id,
                 eos_token_id=tok.eos_token_id,
             )
-        return tok.decode(out[0][ids.shape[1] :], skip_special_tokens=True).strip().replace("\n", " ")
+        return tok.decode(out[0][ids.shape[1] :], skip_special_tokens=True).strip()
 
-    print("\n[samples] adapter only (base comparison needs a reload)")
+    print(f"\n[samples] {args.samples}x per probe, up to {args.max_new_tokens} new tokens")
     for name, prompt in probes:
-        print(f"\n  {name}: {gen(model, prompt)[:220]}")
+        print(f"\n{'=' * 70}\n{name}")
+        for k in range(args.samples):
+            text = gen(model, prompt, args.max_new_tokens)
+            called = canon.M["tool_call"].strip() in text or "### Tool" in text
+            print(f"  [{k + 1}] tool_call_marker={called}")
+            for line in text.splitlines()[:6]:
+                print(f"      {line[:150]}")
 
 
 if __name__ == "__main__":
