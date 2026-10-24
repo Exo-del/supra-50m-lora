@@ -50,11 +50,18 @@ def pick_device(requested: str = "auto"):
     if requested != "auto":
         if requested == "cpu":
             return torch.device("cpu"), torch.float32, False
-        return torch.device(requested), (torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16), True
+        cc = torch.cuda.get_device_capability(0)
+        dtype = torch.bfloat16 if (cc[0] >= 8 and torch.cuda.is_bf16_supported()) else torch.float16
+        return torch.device(requested), dtype, dtype == torch.float16
 
     if not torch.cuda.is_available():
         return torch.device("cpu"), torch.float32, False
-    if torch.cuda.is_bf16_supported():
+
+    # is_bf16_supported() reports True on pre-Ampere cards (e.g. T4, cc 7.5)
+    # via emulation, which is slower than plain fp16 there. Only trust it
+    # from Ampere (cc >= 8.0) onward.
+    cc = torch.cuda.get_device_capability(0)
+    if cc[0] >= 8 and torch.cuda.is_bf16_supported():
         return torch.device("cuda"), torch.bfloat16, False
     return torch.device("cuda"), torch.float16, True
 

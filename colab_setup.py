@@ -46,8 +46,15 @@ def main() -> None:
 
     sh("pip install -q -U peft datasets accelerate")
 
+    # PEFT 0.21 probes torchao for every Linear target and *raises* if the
+    # installed torchao is older than 0.16 (Colab ships 0.10). Removing it
+    # makes PEFT take the plain-LoRA path instead of aborting.
+    import importlib.util
+
+    if importlib.util.find_spec("torchao") is not None:
+        sh("pip uninstall -y -q torchao")
+
     if not (ROOT / "model" / "model.safetensors").exists():
-        sh("python train.py --help > /dev/null")  # triggers the hub pull path
         from huggingface_hub import snapshot_download
 
         snapshot_download(
