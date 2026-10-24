@@ -8,3 +8,5 @@ data/mix_colab.jsonl
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
+data/*.train.jsonl
+data/*.val.jsonl

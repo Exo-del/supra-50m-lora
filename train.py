@@ -203,9 +203,14 @@ def train(args) -> None:
     model.to(device)
 
     rows = load_records(args.data)
-    random.shuffle(rows)
-    split = max(1, int(len(rows) * args.val_split))
-    val_rows, train_rows = rows[:split], rows[split:]
+    if args.val_data:
+        val_rows = load_records(args.val_data)
+        train_rows = rows
+        print(f"[*] held-out val from {args.val_data.name} ({len(val_rows)} rows)")
+    else:
+        random.shuffle(rows)
+        split = max(1, int(len(rows) * args.val_split))
+        val_rows, train_rows = rows[:split], rows[split:]
 
     train_set, d_tr = encode(train_rows, tok, args.max_seq)
     val_set, d_va = encode(val_rows, tok, args.max_seq)
@@ -394,6 +399,7 @@ def main() -> int:
     ap.add_argument("--warmup", type=float, default=0.06)
     ap.add_argument("--max-grad-norm", type=float, default=1.0)
     ap.add_argument("--val-split", type=float, default=0.12)
+    ap.add_argument("--val-data", type=Path, default=None, help="explicit held-out JSONL")
     ap.add_argument("--log-every", type=int, default=5)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--out", type=Path, default=OUT_DIR, help="adapter output directory")

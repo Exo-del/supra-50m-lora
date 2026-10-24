@@ -259,6 +259,8 @@ def main() -> int:
     ap.add_argument("--slice-turns", type=int, default=1,
                     help="split each agent trajectory into up to N turn-level examples")
     ap.add_argument("--max-tokens", type=int, default=384, help="drop rows longer than this")
+    ap.add_argument("--val-frac", type=float, default=0.12,
+                    help="held-out fraction; written to <out>.val.jsonl")
     ap.add_argument("--rng-seed", type=int, default=42)
     ap.add_argument("--out", type=Path, default=OUT)
     args = ap.parse_args()
@@ -312,6 +314,18 @@ def main() -> int:
     with args.out.open("w", encoding="utf-8") as fh:
         for row in records:
             fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+    # Deterministic held-out split so evaluation numbers are comparable
+    # across runs instead of being re-drawn every time.
+    n_val = max(1, int(len(records) * args.val_frac))
+    train_rows, val_rows = records[n_val:], records[:n_val]
+    train_path = args.out.with_suffix(".train.jsonl")
+    val_path = args.out.with_suffix(".val.jsonl")
+    for path, rows in ((train_path, train_rows), (val_path, val_rows)):
+        with path.open("w", encoding="utf-8") as fh:
+            for row in rows:
+                fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+    print(f"    split    : {len(train_rows)} train -> {train_path.name}, {len(val_rows)} val -> {val_path.name}")
 
     lens = [r["tokens"] for r in records]
     by_src = Counter(r["source"] for r in records)
