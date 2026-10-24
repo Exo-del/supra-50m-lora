@@ -70,14 +70,24 @@ val 2.16 -> 1.79 monotonic:
 
 | Source | base loss | +LoRA | reduction |
 |---|---|---|---|
-| agent-tool | 3.07 | 1.15 | 62% |
-| seed (en) | 3.84 | 0.88 | 77% |
-| pt-br-reasoning | 4.29 | 3.53 | 18% |
+| agent-tool | 3.04 | 1.37 | 55% |
+| seed (en) | 4.06 | 2.64 | 35% |
+| pt-br-reasoning | 4.07 | 3.34 | 18% |
 
 The per-source split is the useful signal: aggregate loss hides the fact
-that PT-BR moves ~4x less than the other two. Its text keeps the markup
-and some Portuguese function words but no content, which is what 58 source
-rows can buy. `eval_colab.py` reproduces this table.
+that PT-BR moves ~3x less than the other two. Qualitatively the agent slice
+is the one that produced a genuinely new capability — the adapter emits a
+function-call shape (`update_shipping_location("family": ..., "postal_code"):
+..., "postal_code": ...`) that the base model never produces. PT-BR keeps
+the markup and some Portuguese function words but no content, which is what
+58 source rows buy.
+
+Total tokens seen: ~2.4M (3564 sequence-passes x ~676 tokens). The base was
+pretrained on 20B. Teaching *format* at 0.01% of pretraining volume works;
+teaching *a new language* at that volume cannot work.
+
+`eval_colab.py` reproduces this table.
+
 
 ## Reproduce the diagnostic
 
