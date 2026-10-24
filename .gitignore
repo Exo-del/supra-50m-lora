@@ -3,10 +3,9 @@ lora_out/
 lora_out_v2/
 lora_out_merged/
 model_lora_merged/
-data/mix.jsonl
-data/mix_colab.jsonl
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
-data/*.train.jsonl
-data/*.val.jsonl
+# generated data (keep only the hand-written seed set)
+data/*.jsonl
+!data/seed.jsonl
