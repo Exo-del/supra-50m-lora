@@ -62,15 +62,29 @@ Checkpoints go to `/content/lora_out`, copied to Drive if mounted.
 ## Measured results
 
 CPU, 42 rows, 36 steps, val 3.42 -> 2.97 (LoRA r=16, 1.79M trainable / 53.58M):
-
-| Prompt | Base | +LoRA |
-|---|---|---|
-| "What is a language model?" | incoherent list fragments | coherent definition |
-| PT-BR question | English junk | still junk |
-| "Update my shipping address…" | shell noise | still junk |
-
 English prose style transfers; PT-BR and tool-call grammar need orders of
-magnitude more tokens than 6 or 12 rows. That is the point of the Colab run.
+magnitude more tokens than 6 or 12 rows.
+
+T4, 891 rows, 1024 ctx, batch 4 x accum 8, 98 steps at 2.8 s/step (~5 min),
+val 2.16 -> 1.79 monotonic:
+
+| Source | base loss | +LoRA | reduction |
+|---|---|---|---|
+| agent-tool | 3.07 | 1.15 | 62% |
+| seed (en) | 3.84 | 0.88 | 77% |
+| pt-br-reasoning | 4.29 | 3.53 | 18% |
+
+The per-source split is the useful signal: aggregate loss hides the fact
+that PT-BR moves ~4x less than the other two. Its text keeps the markup
+and some Portuguese function words but no content, which is what 58 source
+rows can buy. `eval_colab.py` reproduces this table.
+
+## Reproduce the diagnostic
+
+```bash
+python eval_colab.py --adapter /content/lora_out --data data/mix_colab.jsonl
+```
+
 
 ## License notes
 
