@@ -140,18 +140,17 @@ def main() -> None:
 
     def gen(model, prompt, n):
         ids = tok(prompt, return_tensors="pt").input_ids.to(device)
+        kw = dict(
+            max_new_tokens=n,
+            do_sample=not args.greedy,
+            repetition_penalty=1.2,
+            pad_token_id=tok.pad_token_id,
+            eos_token_id=tok.eos_token_id,
+        )
+        if not args.greedy:
+            kw.update(temperature=0.5, top_k=25, top_p=0.9)
         with torch.no_grad():
-            out = model.generate(
-                ids,
-                max_new_tokens=n,
-                do_sample=not args.greedy,
-                temperature=0.5 if not args.greedy else None,
-                top_k=25 if not args.greedy else None,
-                top_p=0.9 if not args.greedy else None,
-                repetition_penalty=1.2,
-                pad_token_id=tok.pad_token_id,
-                eos_token_id=tok.eos_token_id,
-            )
+            out = model.generate(ids, **kw)
         return tok.decode(out[0][ids.shape[1] :], skip_special_tokens=True).strip()
 
     print(f"\n[samples] {args.samples}x per probe, up to {args.max_new_tokens} new tokens")
