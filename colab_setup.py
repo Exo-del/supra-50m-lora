@@ -11,17 +11,22 @@ are copied there too so a disconnect does not lose the run.
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
+
+# Must be set before CUDA initialises: reduces allocator fragmentation when
+# the LM-head logits (vocab x seq x batch) fragment the 16 GB T4.
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
 ROOT = Path(__file__).resolve().parent
 OUT = Path("/content/lora_out")
 DRIVE = Path("/content/drive/MyDrive/supra50m_lora")
 
 EPOCHS = 4
-BATCH = 16
-ACCUM = 2
+BATCH = 4       # LM head at vocab 32000 is the memory driver, not the model
+ACCUM = 8       # keeps the effective batch at 32
 SEQ = 1024
 AGENT_ROWS = 1500
 PT_ROWS = 58
@@ -72,7 +77,7 @@ def main() -> None:
     sh(
         f"python train.py --data data/mix_colab.jsonl "
         f"--epochs {EPOCHS} --batch-size {BATCH} --grad-accum {ACCUM} "
-        f"--lr 5e-4 --max-seq {SEQ} --r 16 --alpha 32 "
+        f"--lr 5e-4 --max-seq {SEQ} --r 16 --alpha 32 --grad-checkpoint "
         f"--ckpt-every 1 --out {OUT}"
     )
 

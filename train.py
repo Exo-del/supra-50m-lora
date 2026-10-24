@@ -132,6 +132,40 @@ def encode(rows: list[dict], tok, max_len: int) -> tuple[list[dict], int]:
     return out, dropped
 
 
+def fit_batch_size(model, opt, train_set, tok, device, scaler, batch: int) -> int:
+    """Find a batch size that actually fits, by probing the real step.
+
+    The LM head dominates memory at vocab 32000: a single batch of 16 at
+    seq 1024 is ~524M logits, and HF upcasts those to fp32 for the loss.
+    Halving until the forward+backward succeeds is cheaper than guessing.
+    """
+    import torch
+
+    rng = random.Random(0)
+    while batch >= 2:
+        probe = [train_set[i] for i in rng.sample(range(len(train_set)), min(batch, len(train_set)))]
+        ids, labels, mask = [t.to(device) for t in collate(probe, tok.pad_token_id)]
+        try:
+            loss = model(input_ids=ids, labels=labels, attention_mask=mask).loss
+            if scaler:
+                scaler.scale(loss).backward()
+            else:
+                loss.backward()
+            opt.zero_grad(set_to_none=True)
+            if device.type == "cuda":
+                torch.cuda.empty_cache()
+            print(f"[*] probed batch size {batch}: fits")
+            return batch
+        except torch.OutOfMemoryError:
+            opt.zero_grad(set_to_none=True)
+            if device.type == "cuda":
+                torch.cuda.empty_cache()
+            print(f"[!] OOM at batch {batch} -> halving")
+            batch //= 2
+    print("[!] batch 1 is the floor; continuing with 1")
+    return 1
+
+
 def collate(batch: list[dict], pad_id: int):
     import torch
 
@@ -196,6 +230,12 @@ def train(args) -> None:
 
     params = [p for p in model.parameters() if p.requires_grad]
     opt = torch.optim.AdamW(params, lr=args.lr, betas=(0.9, 0.95), weight_decay=args.weight_decay)
+    if args.grad_checkpoint:
+        model.gradient_checkpointing_enable()
+        if hasattr(model, "enable_input_require_grads"):
+            model.enable_input_require_grads()
+        print("[*] gradient checkpointing: on")
+
     scaler = None
     if device.type == "cuda":
         try:
@@ -203,7 +243,11 @@ def train(args) -> None:
         except TypeError:  # torch < 2.3
             scaler = torch.cuda.amp.GradScaler(enabled=needs_scaler)
 
-    micro_per_epoch = max(1, len(train_set) // args.batch_size)
+    bs = fit_batch_size(model, opt, train_set, tok, device, scaler, args.batch_size)
+    if bs != args.batch_size:
+        print(f"[!] effective batch size: {bs} (requested {args.batch_size}), grad-accum {args.grad_accum}")
+
+    micro_per_epoch = max(1, len(train_set) // bs)
     total_steps = max(1, micro_per_epoch * args.epochs // args.grad_accum)
     warmup = max(1, int(total_steps * args.warmup))
     print(f"[*] schedule: {total_steps} optimizer steps, {warmup} warmup")
@@ -222,15 +266,24 @@ def train(args) -> None:
         random.shuffle(order)
         running, seen = 0.0, 0
 
-        for i in range(0, len(order) - args.batch_size + 1, args.batch_size):
-            batch = [train_set[j] for j in order[i : i + args.batch_size]]
+        for i in range(0, len(order) - bs + 1, bs):
+            batch = [train_set[j] for j in order[i : i + bs]]
             ids, labels, mask = [t.to(device, non_blocking=True) for t in collate(batch, tok.pad_token_id)]
 
-            loss = model(input_ids=ids, labels=labels, attention_mask=mask).loss / args.grad_accum
-            if scaler:
-                scaler.scale(loss).backward()
-            else:
-                loss.backward()
+            try:
+                loss = model(input_ids=ids, labels=labels, attention_mask=mask).loss / args.grad_accum
+                if scaler:
+                    scaler.scale(loss).backward()
+                else:
+                    loss.backward()
+            except torch.OutOfMemoryError:
+                # Shrink and skip this microbatch rather than killing the run.
+                opt.zero_grad(set_to_none=True)
+                if device.type == "cuda":
+                    torch.cuda.empty_cache()
+                bs = max(1, bs // 2)
+                print(f"[!] OOM mid-run -> batch size now {bs}")
+                continue
 
             running += loss.item() * args.grad_accum
             seen += 1
@@ -262,8 +315,8 @@ def train(args) -> None:
         model.eval()
         with torch.no_grad():
             vl, vn = 0.0, 0
-            for i in range(0, len(val_set), args.batch_size):
-                ids, labels, mask = [t.to(device) for t in collate(val_set[i : i + args.batch_size], tok.pad_token_id)]
+            for i in range(0, len(val_set), bs):
+                ids, labels, mask = [t.to(device) for t in collate(val_set[i : i + bs], tok.pad_token_id)]
                 vl += model(input_ids=ids, labels=labels, attention_mask=mask).loss.item()
                 vn += 1
         model.train()
@@ -345,6 +398,7 @@ def main() -> int:
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--out", type=Path, default=OUT_DIR, help="adapter output directory")
     ap.add_argument("--device", default="auto", help="auto | cpu | cuda")
+    ap.add_argument("--grad-checkpoint", action="store_true", help="trade speed for activation memory")
     ap.add_argument("--ckpt-every", type=int, default=1, help="save an adapter checkpoint every N epochs")
     ap.add_argument("--merge", action="store_true", help="also save merged fp32 weights")
     ap.add_argument("--demo", action="store_true", help="generate a sample after training")
