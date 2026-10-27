@@ -100,17 +100,19 @@ def is_english(text: str, min_words: int = 30) -> bool:
     letters = [c for c in text if c.isalpha()]
     if not letters:
         return False
-    non_ascii = sum(1 for c in letters if ord(c) > 127) / len(letters)
-    if non_ascii > 0.03:
+    accented = sum(1 for c in letters if ord(c) > 127)
+    if accented >= 4 and accented / len(letters) > 0.01:
         return False
 
     words = re.findall(r"[a-z']+", text.lower())[:800]
     if len(words) < min_words:
         return True  # too short to judge; keep short answers/code
     en = sum(w in EN_STOP for w in words)
+    # Distinct-language markers beat raw counts: "no"/"con" appear in English,
+    # so only reject when a foreign profile clearly out-hits English.
     for stops in FOREIGN_STOP.values():
         hits = sum(w in stops for w in words)
-        if hits >= 6 and hits > 0.6 * en:
+        if hits >= 4 and hits > en:
             return False
     return True
 
