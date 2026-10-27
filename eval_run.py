@@ -69,6 +69,19 @@ PROBES = [
     ),
 ]
 
+# The headline capability has no single-turn equivalent: given a tool result,
+# does the model *use* it, or does it call the same tool again? Rendered with
+# canon.render so the prompt ends exactly where the supervised turn begins.
+_FOLLOW_MSGS = [
+    {"role": "system",
+     "content": "You are an assistant with one function: get_weather({\"city\": string})."},
+    {"role": "user", "content": "What is the weather in Rabat right now?"},
+    {"role": "assistant", "content": "Let me check.",
+     "tool_calls": [{"function": {"name": "get_weather", "arguments": "{\"city\": \"Rabat\"}"}}]},
+    {"role": "tool", "name": "get_weather", "content": "{\"temp_c\": 24, \"sky\": \"clear\"}"},
+]
+FOLLOW_PROBE = "tool-follow", "".join(seg["text"] for seg in canon.render(_FOLLOW_MSGS))
+
 
 def load(path, dtype, device):
     from transformers import AutoModelForCausalLM
@@ -197,13 +210,18 @@ def main() -> int:
 
     print(f"\n[samples] {args.samples}x per probe, up to {args.max_new_tokens} new tokens")
     checks = {}
-    for name, prompt in PROBES:
+    for name, prompt in [*PROBES, FOLLOW_PROBE]:
         print(f"\n{'=' * 70}\n{name}")
         hits = 0
         for k in range(args.samples):
             text = gen(prompt, args.max_new_tokens)
             called = canon.M["tool_call"].strip() in text
-            if name == "tool-call":
+            if name == "tool-follow":
+                # uses the payload (24 / clear) and does not re-call the tool
+                used = ("24" in text) and ("get_weather" not in text)
+                ok = used
+                flag = f"used_result={used} recall={'get_weather' in text}"
+            elif name == "tool-call":
                 parsed = bool(_CALL_LINE.search(text))
                 ok = called and parsed
                 flag = f"tool_call={called} parsed={parsed}"

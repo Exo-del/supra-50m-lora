@@ -14,6 +14,8 @@ import json
 import os
 import pathlib
 import sys
+import http.client
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -39,6 +41,31 @@ def get(path: str, tok: str):
     req.add_header("Authorization", f"Bearer {tok}")
     with urllib.request.urlopen(req, timeout=120) as r:
         return r.read()
+
+
+def get_abs(url: str, tries: int = 4) -> bytes:
+    """Download one output file from the signed kaggleusercontent URL.
+
+    The CDN drops long transfers, so resume with a Range header instead of
+    restarting a 40 MB download from zero.
+    """
+    buf = b""
+    for _ in range(tries):
+        req = urllib.request.Request(url)
+        if buf:
+            req.add_header("Range", f"bytes={len(buf)}-")
+        try:
+            with urllib.request.urlopen(req, timeout=600) as r:
+                buf += r.read()
+            return buf
+        except (http.client.IncompleteRead, urllib.error.URLError) as exc:
+            got = getattr(exc, "partial", b"") or b""
+            chunk = getattr(exc, "partial", None)
+            if chunk:
+                buf += chunk
+            print(f"      (resume after {len(buf):,} bytes)")
+            continue
+    raise SystemExit("[!] download kept failing")
 
 
 def main() -> int:
@@ -67,13 +94,19 @@ def main() -> int:
     files = info.get("files") or []
     print(f"[*] output files: {len(files)}")
     for f in files:
-        name = f.get("name") or f.get("fileName")
+        name = f.get("fileName") or f.get("name")
         size = f.get("totalBytes") or f.get("size") or 0
         print(f"    {name}  {size:,} bytes" if isinstance(size, int) else f"    {name}")
         if not name or args.list_only:
             continue
-        data = get(f"kernels/output/{urllib.parse.quote(name)}?userName={args.user}&kernelSlug={args.slug}", tok)
+        if name.startswith("repo/") or "/.cache/" in name:
+            print("      (skipped: kernel working dir, not an artifact)")
+            continue
+        url = f.get("url")
+        data = get_abs(url) if url else get(
+            f"kernels/output/{urllib.parse.quote(name)}?userName={args.user}&kernelSlug={args.slug}", tok)
         dest = out / pathlib.Path(name).name
+        dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(data)
         print(f"      -> {dest} ({len(data):,} bytes)")
     return 0

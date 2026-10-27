@@ -10,3 +10,4 @@ __pycache__/
 data/*.jsonl
 !data/seed.jsonl
 data/*.report.json
+runs/
