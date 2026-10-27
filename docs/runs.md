@@ -99,7 +99,47 @@ Mix moved from glaive-dominated to code/math/glaive roughly balanced with 13%
 deepseek. Val loss 1.728 (slightly up: more multi-turn rows, longer contexts,
 less repetition of the easy glaive slice).
 
-<!--RESULTS_V42-->
+### Per-source loss reduction (12 rows/source, base -> adapter)
+
+| source | base | +LoRA | reduction |
+|---|---|---|---|
+| `math-gsm8k` | 3.204 | 1.114 | +65% |
+| `code-magicoder` | 2.810 | 1.252 | +55% |
+| `math-instruct` | 3.238 | 1.463 | +55% |
+| `agent-deepseek` | 3.207 | 1.551 | **+52%** |
+| `agent-glaive` | 2.986 | 0.373 | +88% (recall) |
+| `general` | 3.523 | 2.234 | +37% |
+| `seed` | 4.224 | 2.769 | +34% |
+
+Read the deepseek number carefully. In v4 it was +64% on **one-turn** rows the
+builder had effectively seen 70 times each; here it is +52% on **multi-turn**
+rows (2-4 assistant turns, tool calls, tool results) drawn from 892 examples
+that make up 13% of the mix. Slightly smaller percentage, much harder task.
+`agent-glaive` is still at 0.37: 18% of the mix and simple single-tool shapes,
+so it is still being recalled rather than learned.
+
+### Probes
+
+```
+no-tool      1/1   PASS  answers without calling a tool
+tool-follow  1/1   PASS  used the tool result, did not re-call the tool
+tool-call    0/1   fail
+math         0/1   fail
+code         0/1   fail
+```
+
+`tool-follow` is the one that matters: given a rendered
+`system -> user -> tool call -> tool result` history, the adapter answered from
+the payload ("Sky: clear") and did not loop on the tool. That is the first
+multi-turn behaviour any of these adapters has demonstrated, and it is new with
+the prefix fix. It then drifts ("-sky: cloudy" afterwards) — 50M parameters and
+60 greedy tokens, not a deployment.
+
+`tool-call` still failing while `tool-follow` passes is informative: the model
+will *use* a tool result but will not *emit* a call from a cold prompt. In the
+mix, calls always follow a system prompt that lists a tool schema (glaive,
+deepseek); the probe's system line is terse. Worth retesting with a
+glaive-shaped system block before concluding anything about the adapter.
 
 ## What the probes mean
 

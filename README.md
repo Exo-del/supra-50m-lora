@@ -129,13 +129,39 @@ Qualitatively the agent slice produced a genuinely new capability — the adapte
 emits a function-call shape that the base never produces. That is why v4 keeps
 agentic data as the largest block.
 
-### v4 run (English-only)
+### v4 → v4.2 (English-only)
 
-Filled in by `eval_run.py` after the Kaggle job; see `runs/v4/` for the raw log
-and `data/mix_v4.report.json` for the mix audit.
+Three T4 runs, full detail in [`docs/runs.md`](docs/runs.md):
+
+| run | unique tokens | wall | val | agentic share | probes |
+|---|---|---|---|---|---|
+| v4 | 3.28M | 39 min | 1.718 | deepseek **2%** | 2/4 |
+| v4.1 | 4.11M | 45 min | 1.698 | deepseek 1%, code 20% | 2/4 |
+| v4.2 | 4.67M | 52 min | 1.728 | deepseek **13%**, code 21% | 3/5 |
+
+v4.2 per-source loss reduction (12 rows/source):
+
+| source | base | +LoRA | reduction |
+|---|---|---|---|
+| `math-gsm8k` | 3.204 | 1.114 | 65% |
+| `code-magicoder` | 2.810 | 1.252 | 55% |
+| `math-instruct` | 3.238 | 1.463 | 55% |
+| `agent-deepseek` (multi-turn) | 3.207 | 1.551 | 52% |
+| `agent-glaive` | 2.986 | 0.373 | 88% (recall, not capability) |
+| `general` | 3.523 | 2.234 | 37% |
+
+Probes: `no-tool` and **`tool-follow`** pass; `tool-call`, `math`, `code` fail.
+`tool-follow` is the first multi-turn behaviour demonstrated: given a tool
+result, the adapter answers from the payload instead of re-calling the tool.
+
+The three runs exist because each log exposed a data bug the previous one hid:
+OpenThoughts traces never fit the context, the agent rows are conversation
+prefixes (dedupe-by-id kept only the one-turn prefix), and one GSM8K question
+contained a `U+2028` that broke every line-oriented reader. All three are
+regression-tested in `tests/test_parsers.py`.
 
 ## License notes
 
-Base weights Apache-2.0 (SupraLabs). Agent set see its card, OpenThoughts
-Apache-2.0, GSM8K MIT, MathInstruct MIT, Dolly MIT, Glaive Apache-2.0.
+Base weights Apache-2.0 (SupraLabs). Agent set see its card, Magicoder MIT,
+GSM8K MIT, MathInstruct MIT, Dolly MIT, Glaive Apache-2.0.
 Code here is provided as-is.
