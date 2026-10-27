@@ -221,8 +221,9 @@ def main() -> int:
             text = gen(prompt, args.max_new_tokens)
             called = canon.M["tool_call"].strip() in text
             if name == "tool-follow":
-                # uses the payload (24 / clear) and does not re-call the tool
-                used = ("24" in text) and ("get_weather" not in text)
+                # uses either payload value (24 / clear) and does not loop
+                low = text.lower()
+                used = ("24" in text or "clear" in low) and "get_weather" not in low
                 ok = used
                 flag = f"used_result={used} recall={'get_weather' in text}"
             elif name == "tool-call":
