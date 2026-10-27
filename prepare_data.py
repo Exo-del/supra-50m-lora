@@ -81,9 +81,9 @@ WEIGHTS = {
     "agent-deepseek": 0.24,
     "agent-glaive": 0.14,
     "math-gsm8k": 0.14,
-    "math-instruct": 0.12,
-    "code-magicoder": 0.16,
-    "general": 0.16,
+    "math-instruct": 0.11,
+    "code-magicoder": 0.14,
+    "general": 0.19,
     "seed": 0.04,
 }
 
@@ -201,7 +201,8 @@ def from_agent_deepseek(cap: int, rng: random.Random, slice_k: int = 4, min_scor
             reasoning = canon.sanitize(msg.get("reasoning"))
 
             if role == "system":
-                entry = {"role": "system", "content": canon.clip(content, B["sys_agent"])}
+                entry = {"role": "system",
+                         "content": canon.clip(canon.compact_json_blocks(content), B["sys_agent"])}
             elif role == "user":
                 entry = {"role": "user", "content": canon.clip(content, B["msg"])}
             elif role == "assistant":
@@ -214,7 +215,8 @@ def from_agent_deepseek(cap: int, rng: random.Random, slice_k: int = 4, min_scor
                 if not entry["content"] and not entry["tool_calls"]:
                     continue
             elif role in ("tool", "function"):
-                entry = {"role": "tool", "content": canon.clip(content, B["tool"]), "name": msg.get("name")}
+                entry = {"role": "tool", "name": msg.get("name"),
+                         "content": canon.clip(canon.compact_json_blocks(content), B["tool"])}
             else:
                 continue
             msgs.append(entry)
@@ -327,7 +329,8 @@ def from_agent_glaive(cap: int, rng: random.Random, slice_k: int = 3) -> list[di
             continue
 
         msgs = []
-        sys_txt = canon.sanitize((row.get("system") or "").replace("SYSTEM:", "", 1))
+        sys_txt = canon.compact_json_blocks(
+            canon.sanitize((row.get("system") or "").replace("SYSTEM:", "", 1)))
         if sys_txt:
             msgs.append({"role": "system", "content": canon.clip(sys_txt, B["sys_agent"])})
 
@@ -342,7 +345,8 @@ def from_agent_glaive(cap: int, rng: random.Random, slice_k: int = 3) -> list[di
             elif role == "FUNCTION RESPONSE":
                 last = next((m for m in reversed(msgs) if m.get("tool_calls")), None)
                 name = ((last or {}).get("tool_calls") or [{}])[0].get("function", {}).get("name")
-                msgs.append({"role": "tool", "content": canon.clip(body, B["tool"]), "name": name})
+                msgs.append({"role": "tool", "name": name,
+                             "content": canon.clip(canon.compact_json_blocks(body), B["tool"])})
             elif role == "ASSISTANT":
                 calls, text = _split_functioncalls(body)
                 entry = {"role": "assistant", "content": canon.clip(text, B["answer"])}
@@ -352,7 +356,8 @@ def from_agent_glaive(cap: int, rng: random.Random, slice_k: int = 3) -> list[di
                     continue
                 msgs.append(entry)
             elif role == "SYSTEM":
-                msgs.append({"role": "system", "content": canon.clip(body, B["sys_agent"])})
+                msgs.append({"role": "system",
+                             "content": canon.clip(canon.compact_json_blocks(body), B["sys_agent"])})
 
         while msgs and msgs[-1].get("role") != "assistant":
             msgs.pop()

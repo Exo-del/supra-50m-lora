@@ -71,6 +71,66 @@ def sanitize(text: str | None) -> str:
     return text.strip()
 
 
+def scan_json_object(text: str, start: int) -> tuple[str | None, int]:
+    """Quote-aware brace scan from text[start]. Returns (blob, end_index)."""
+    depth, in_str, esc = 0, False, False
+    for i in range(start, len(text)):
+        c = text[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif c == "\\":
+                esc = True
+            elif c == '"':
+                in_str = False
+            continue
+        if c == '"':
+            in_str = True
+        elif c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start: i + 1], i + 1
+    return None, len(text)
+
+
+def compact_json_blocks(text: str) -> str:
+    """Re-dump pretty-printed JSON objects on a single line.
+
+    Tool-calling datasets pretty-print the function schema in the system
+    prompt, while `tool_calls_to_text` renders calls flat. The model copied
+    the schema's layout into its arguments -- `name(\n"arg": "x".json")` --
+    so give it one layout everywhere. Non-JSON text (prose, code) is untouched.
+    """
+    out: list[str] = []
+    i = 0
+    while True:
+        j = text.find("{", i)
+        if j < 0:
+            out.append(text[i:])
+            break
+        blob, end = scan_json_object(text, j)
+        if not blob:
+            out.append(text[i:j + 1])
+            i = j + 1
+            continue
+        try:
+            parsed = json.loads(blob)
+        except json.JSONDecodeError:
+            out.append(text[i:end])
+            i = end
+            continue
+        if "\n" in blob:
+            out.append(text[i:j])
+            out.append(json.dumps(parsed, ensure_ascii=False, separators=(",", ":")))
+            i = end
+        else:
+            out.append(text[i:end])
+            i = end
+    return "".join(out)
+
+
 def strip_calc_markers(text: str) -> str:
     """GSM8K annotates each step as `<<12*2=24>>` and then repeats the value.
 

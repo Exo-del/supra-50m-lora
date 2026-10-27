@@ -12,7 +12,7 @@ URL = "https://www.kaggle.com/mcp"
 TOKEN = "KGAT_7ac3b44e857b4ae9b6eb211c80aa6e18"
 REPO = pathlib.Path("/home/louhmiwaslost/Desktop/Workspace/small_agent_50M")
 SRC = REPO / "kaggle" / "run_kaggle.py"
-SLUG = "supra50m-v4-lora"
+SLUG = "supra50m-v5-lora"
 
 
 def _post(body, sid=None):
@@ -50,8 +50,8 @@ def main() -> int:
     print(f"[*] script: {SRC} ({len(text)} bytes)")
     req = {
         "slug": SLUG, "slugNullable": SLUG, "hasSlug": True,
-        "newTitle": "Supra-50M v4 LoRA: english agentic + reasoning",
-        "newTitleNullable": "Supra-50M v4 LoRA: english agentic + reasoning",
+        "newTitle": "Supra-50M v5 LoRA: compact json schema 2048 ctx",
+        "newTitleNullable": "Supra-50M v5 LoRA: compact json schema 2048 ctx",
         "hasNewTitle": True,
         "text": text, "textNullable": text, "hasText": True,
         "language": "python", "languageNullable": "python", "hasLanguage": True,

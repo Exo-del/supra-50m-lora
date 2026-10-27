@@ -1,4 +1,4 @@
-"""Kaggle driver: build the v4 English mix, LoRA-train Supra-50M, evaluate.
+"""Kaggle driver: build the English mix, LoRA-train Supra-50M, evaluate.
 
 This file is pushed to Kaggle as a *script* kernel (GPU T4, internet on).
 It clones the repo, so the code that runs is exactly the code in main.
@@ -29,7 +29,7 @@ REPO = "https://github.com/Exo-del/supra-50m-lora.git"
 BASE_REPO = "SupraLabs/Supra-50M-Base"
 WORK = pathlib.Path("/kaggle/working")
 SRC = WORK / "repo"
-VERSION = "v42"
+VERSION = "v5"
 OUT = WORK / f"lora_out_{VERSION}"
 DATA = SRC / "data" / f"mix_{VERSION}.jsonl"
 
@@ -37,7 +37,7 @@ TARGET_TOKENS = 6_000_000
 EPOCHS = 3
 BATCH = 4
 ACCUM = 8
-SEQ = 1024
+SEQ = 2048
 LR = 5e-4
 SAVE_STEPS = 500
 
@@ -94,7 +94,8 @@ def main() -> int:
         "python prepare_data.py --profile kaggle "
         f"--target-tokens {TARGET_TOKENS} "
         "--slice-turns 6 --cap-per-source 20000 --val-frac 0.05 "
-        "--out data/mix_v42.jsonl"
+        f"--max-tokens {SEQ} "
+        f"--out data/mix_{VERSION}.jsonl"
     )
 
     banner("train")
