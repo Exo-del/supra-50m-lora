@@ -1,4 +1,4 @@
-# Run log: v4 → v4.2
+# Run log: v4 → v5
 
 Three runs on the same base, T4, 6M-token target, 3 epochs, bs 4 x accum 8,
 seq 1024, lr 5e-4, r16 / alpha 32. Each one fixed something the previous log
@@ -9,9 +9,29 @@ exposed. Logs in `runs/<slug>/kernel.log`, adapters in `runs/<slug>/*.zip`.
 | v4 | `supra-50m-v4-lora-english-agentic-reasoning` | 3.28M | 39.0 min | 1.718 |
 | v4.1 | `supra-50m-v4-1-lora-english-agentic-reasoning` | 4.11M | 45.3 min | 1.698 |
 | v4.2 | `supra-50m-v4-2-lora-agent-prefixes-reasoning-mix` | 4.67M | 51.5 min | 1.728 |
+| v5 | `supra-50m-v5-lora-compact-json-schema-2048-ctx` | 4.87M | running | — |
 
 Throughput is ~4.3k tok/s at bs 4 x 1024 on a T4, so a run costs under an hour
 of the 30 h weekly GPU quota. Iterating is cheap; shipping a broken mix is not.
+
+## v5: three orthogonal fixes
+
+v4.2's probes passed `no-tool` and `tool-follow` but failed `tool-call`: the
+adapter emitted `update_shipping_location(` followed by `"location": "42main-st".json")`
+— it had learned the *pretty-printed schema layout* from the system prompt and
+copied the newlines into its arguments. So:
+
+1. `canon.compact_json_blocks` re-dumps every embedded JSON object on one line
+   (system + tool messages only, so Magicoder prose is untouched). 5,610 blocks,
+   1.06 MB of schema text flattened, 0 multiline JSON left.
+2. `SEQ` 1024 → 2048 and `--max-tokens 2048`, so rows the clipper already capped
+   at ~1.1k tokens are kept instead of dropped: deepseek 607k → 993k tokens (13% → 20%).
+3. `general` 0.16 → 0.19, magicoder 0.16 → 0.14, math-instruct 0.12 → 0.11.
+
+The weight is a ceiling, not a quota: dolly saturates at 690k tokens (14% of the
+mix), so `general` did not actually grow. Absolute tokens held steady vs v4.2.
+
+Local build: 22,803 rows / 4.87M tokens, max row 1,667 tok, agentic 37%.
 
 ## Realised mix per run
 
