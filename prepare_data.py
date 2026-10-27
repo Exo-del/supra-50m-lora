@@ -213,8 +213,88 @@ def from_agent_deepseek(cap: int, rng: random.Random, slice_k: int = 4) -> list[
     return rows[:cap]
 
 
-_FN_CALL = re.compile(r"<functioncall>\s*(\{.*?\})\s*</functioncall>", re.S)
+_FN_TAG = "<functioncall>"
 _GLAIVE_ROLE = re.compile(r"^(SYSTEM|USER|ASSISTANT|FUNCTION RESPONSE):", re.M)
+
+
+def _extract_json_object(text: str, start: int) -> tuple[str | None, int]:
+    """Scan one balanced JSON object from text[start]; quote-aware.
+
+    glaive wraps calls as `<functioncall> {...}` and often omits the closing
+    tag, while `arguments` is a *nested JSON string*, so a non-greedy regex
+    stops inside the wrong brace. Walk the braces instead.
+    """
+    depth, in_str, esc = 0, False, False
+    for i in range(start, len(text)):
+        c = text[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif c == "\\":
+                esc = True
+            elif c == '"':
+                in_str = False
+            continue
+        if c == '"':
+            in_str = True
+        elif c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start: i + 1], i + 1
+    return None, len(text)
+
+
+def _repair_call(blob: str) -> dict | None:
+    """Recover a call from glaive's not-quite-JSON arguments.
+
+    The dataset writes arguments as a single-quoted JSON string
+    ('{"country": "United States"}'), which json.loads rejects. Pull the
+    name and the raw argument payload out by hand; the renderer accepts
+    either a JSON string or a dict.
+    """
+    m = re.search(r'"name"\s*:\s*"([^"]+)"', blob)
+    if not m:
+        return None
+    name = m.group(1)
+    a = re.search(r'"arguments"\s*:\s*(.+?)\s*\}\s*$', blob, re.S)
+    raw = a.group(1).strip() if a else "{}"
+    if len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in "'\"":
+        raw = raw[1:-1]
+    try:
+        json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        raw = raw.strip() or "{}"
+    return {"name": name, "arguments": raw}
+
+
+def _split_functioncalls(body: str) -> tuple[list[dict], str]:
+    """Pull tool calls out of a glaive assistant block, return (calls, text)."""
+    calls, text_parts, idx = [], [], 0
+    while True:
+        j = body.find(_FN_TAG, idx)
+        if j < 0:
+            text_parts.append(body[idx:])
+            break
+        text_parts.append(body[idx:j])
+        k = body.find("{", j)
+        if k < 0:
+            idx = j + len(_FN_TAG)
+            continue
+        blob, end = _extract_json_object(body, k)
+        obj = None
+        if blob:
+            try:
+                obj = json.loads(blob)
+            except json.JSONDecodeError:
+                obj = _repair_call(blob)
+        if obj:
+            calls.append({"function": {"name": obj.get("name"), "arguments": obj.get("arguments")}})
+        idx = end + (len("</functioncall>") if body.startswith("</functioncall>", end) else 0)
+    text = "".join(text_parts).replace("</functioncall>", "").strip()
+    return calls, text
+
 
 
 def from_agent_glaive(cap: int, rng: random.Random, slice_k: int = 3) -> list[dict]:
@@ -246,14 +326,7 @@ def from_agent_glaive(cap: int, rng: random.Random, slice_k: int = 3) -> list[di
                 name = ((last or {}).get("tool_calls") or [{}])[0].get("function", {}).get("name")
                 msgs.append({"role": "tool", "content": canon.clip(body, B["tool"]), "name": name})
             elif role == "ASSISTANT":
-                calls = []
-                for blob in _FN_CALL.findall(body):
-                    try:
-                        obj = json.loads(blob)
-                    except json.JSONDecodeError:
-                        continue
-                    calls.append({"function": {"name": obj.get("name"), "arguments": obj.get("arguments")}})
-                text = _FN_CALL.sub("", body).strip()
+                calls, text = _split_functioncalls(body)
                 entry = {"role": "assistant", "content": canon.clip(text, B["answer"])}
                 if calls:
                     entry["tool_calls"] = calls
@@ -312,11 +385,11 @@ def from_math_instruct(cap: int, rng: random.Random) -> list[dict]:
         out = canon.sanitize(row.get("output"))
         if not q or len(out) < 80:
             continue
-        if "the answer is" in out.lower():
-            steps, _, final = out.rpartition("he answer is")
-            thinking, answer = steps.rstrip(" .") + " .", final.strip()
-            if not thinking.strip():
-                thinking, answer = "", out
+        low = out.lower()
+        idx = low.rfind("the answer is")
+        if idx > 40:
+            thinking = out[:idx].strip().rstrip(".:")
+            answer = out[idx + len("the answer is"):].strip(" .:\n")
         else:
             thinking, answer = "", out
         msgs = [
@@ -347,25 +420,37 @@ def from_think_code(cap: int, rng: random.Random, max_chars: int = 3000) -> list
         if len(conv) < 2:
             continue
         user = canon.sanitize(conv[0].get("value"))
-        asst = canon.sanitize(conv[1].get("value"))
-        if not user or len(asst) < 120 or len(asst) > max_chars:
+        raw_asst = conv[1].get("value") or ""
+        if not user or len(raw_asst) > max_chars:
             continue
+
+        # Split on the template markers *before* sanitize strips them,
+        # otherwise the whole trace lands in the answer and the model never
+        # learns the "think, then answer" shape.
+        t_raw, a_raw = "", raw_asst
+        low_raw = raw_asst.lower()
+        for marker in ("<|end_of_thought|>", "<|begin_of_solution|>", "<|end_of_solution|>"):
+            pos = low_raw.find(marker)
+            if pos >= 0:
+                t_raw, a_raw = raw_asst[:pos], raw_asst[pos + len(marker):]
+                break
+        if not t_raw and "## solution" in low_raw:
+            pos = low_raw.index("## solution")
+            t_raw, a_raw = raw_asst[:pos], raw_asst[pos + len("## solution"):]
+
+        thinking = canon.sanitize(t_raw)
+        asst = canon.sanitize(a_raw)
+        if len(asst) < 40:
+            continue
+
         domain = str(row.get("domain") or "")
         is_code = "python function" in user.lower() or "code" in domain.lower()
         if not (is_code or "math" in domain.lower()):
             continue
 
-        # split Thought / Solution if the template markers survived
-        thinking, answer = "", asst
-        low = asst.lower()
-        if "## solution" in low:
-            idx = low.index("## solution")
-            thinking, answer = asst[:idx].strip(), asst[idx + len("## solution"):].strip()
-        if not answer:
-            answer = asst
         msgs = [
             {"role": "user", "content": canon.clip(user, B["prompt"])},
-            {"role": "assistant", "thinking": canon.clip(thinking, B["think"]), "content": canon.clip(answer, B["answer"])},
+            {"role": "assistant", "thinking": canon.clip(thinking, B["think"]), "content": canon.clip(asst, B["answer"])},
         ]
         rows.append(_row(msgs, "think-code", "code" if is_code else "math-think"))
         if len(rows) >= cap or scanned > cap * 40:

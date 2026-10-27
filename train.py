@@ -235,7 +235,10 @@ def train(args) -> None:
     print(f"[*] LoRA trainable: {trainable:,} / {total:,} ({100 * trainable / total:.2f}%)")
 
     if args.resume:
-        from peft import PeftModel
+        # The model is already a PeftModel: wrapping it again gives
+        # base_model.model.base_model.model... keys that never match, so load
+        # the adapter weights into the existing "default" adapter instead.
+        from peft import load_peft_weights, set_peft_model_state_dict
 
         cands = [p for p in args.out.glob("*") if (p / "adapter_config.json").exists()]
         if (args.out / "adapter_config.json").exists():
@@ -243,8 +246,15 @@ def train(args) -> None:
         cands.sort(key=lambda p: p.stat().st_mtime)
         if cands:
             src = cands[-1]
-            model = PeftModel.from_pretrained(model, str(src), is_trainable=True)
-            print(f"[*] resumed adapter <- {src}")
+            state = load_peft_weights(str(src), device="cpu")
+            res = set_peft_model_state_dict(model, state)
+            # "missing" here is just the frozen base weights, which are not in
+            # an adapter state dict; only unexpected keys mean a real mismatch.
+            unexpected = getattr(res, "unexpected_keys", []) or []
+            n_lora = sum(1 for k in state if "lora_" in k)
+            print(f"[*] resumed adapter <- {src} ({n_lora} LoRA tensors, unexpected {len(unexpected)})")
+            if unexpected:
+                print(f"[!] adapter key mismatch; first unexpected={unexpected[:2]}")
         else:
             print("[!] --resume given but no adapter found; starting fresh")
 

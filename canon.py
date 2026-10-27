@@ -34,8 +34,9 @@ _TAGS = re.compile(
 _SQUARE = re.compile(r"\[/?INST\]|<<SYS>>|</?s>")
 _WS = re.compile(r"[ \t]+\n")
 _MULTI = re.compile(r"\n{3,}")
-# GSM8K calculator annotations: "<<12*2=24>>" -> "24"
-_CALC = re.compile(r"<<[^>]*=([^>]*)>>")
+# GSM8K calculator annotations: "<<12*2=24>>" is dropped, leaving the value
+# that already follows it in the text.
+_CALC = re.compile(r"<<[^<>]*>>")
 _ENDTEXT = re.compile(r"<\|endoftext\|>")
 
 EN_STOP = frozenset(
@@ -66,8 +67,13 @@ def sanitize(text: str | None) -> str:
 
 
 def strip_calc_markers(text: str) -> str:
-    """GSM8K writes `<<12*2=24>>`; keep only the computed value."""
-    return _CALC.sub(r"\1", text or "")
+    """GSM8K annotates each step as `<<12*2=24>>` and then repeats the value.
+
+    The annotation is *deleted*, not replaced: `12 x 2 = <<12*2=24>>24 pages`
+    becomes `12 x 2 = 24 pages`. Substituting the value instead would emit
+    `12 x 2 = 2424 pages`.
+    """
+    return _CALC.sub("", text or "")
 
 
 def clip(text: str, limit: int) -> str:
