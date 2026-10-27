@@ -20,8 +20,10 @@ Sources (all English)
                     short clean CoT, `<<..=..>>` calculator markers stripped.
     math-instruct   TIGER-Lab/MathInstruct
                     short CoT / program-of-thought answers across maths.
-    think-code      open-thoughts/OpenThoughts-114k
-                    R1-style Thought/Solution traces, FILTERED TO SHORT ONES.
+    code-magicoder  ise-uiuc/Magicoder-OSS-Instruct-75K
+                    short, English, competitive-programming solutions across
+                    languages. A leading prose comment block, when present, is
+                    split off as the thinking block.
     general         databricks/databricks-dolly-15k
                     no-tool answers (negative class), context-free only.
     seed            data/seed.jsonl (local anchors, hand written)
@@ -31,6 +33,12 @@ Dropped on purpose
     was in v1-v3 of this mix. It is Portuguese, the target is an English
     agentic/reasoning adapter, and 58 rows buy ~18% loss reduction on a slice
     that is 3% of the data. Removed in v4; see README "What changed in v4".
+
+    open-thoughts/OpenThoughts-114k was the v4 reasoning slot and had to go:
+    its assistant traces have a median length of 24.4k chars (p10 9.5k), and
+    **0 of 120 sampled rows fit a 3k-char budget**. With a 1024-token context
+    the source can only be used by truncating the chain of thought, which is
+    exactly what teaches a model to ramble. Replaced in v4.1 by Magicoder.
 
 Why short traces are filtered, not clipped
     Truncating a chain-of-thought mid-way teaches the model to ramble and
@@ -65,17 +73,17 @@ DS_AGENT = "zake7749/deepseek-v4-pro-agent-tool-calling-trajectory"
 DS_GLAIVE = "glaiveai/glaive-function-calling-v2"
 DS_GSM8K = "openai/gsm8k"
 DS_MATHIN = "TIGER-Lab/MathInstruct"
-DS_THINK = "open-thoughts/OpenThoughts-114k"
+DS_CODE = "ise-uiuc/Magicoder-OSS-Instruct-75K"
 DS_GENERAL = "databricks/databricks-dolly-15k"
 
 # Token share per source. Renormalised over whichever sources are enabled.
 WEIGHTS = {
-    "agent-deepseek": 0.26,
+    "agent-deepseek": 0.27,
     "agent-glaive": 0.18,
     "math-gsm8k": 0.13,
     "math-instruct": 0.11,
-    "think-code": 0.16,
-    "general": 0.14,
+    "code-magicoder": 0.14,
+    "general": 0.15,
     "seed": 0.02,
 }
 
@@ -404,56 +412,89 @@ def from_math_instruct(cap: int, rng: random.Random) -> list[dict]:
     return rows[:cap]
 
 
-def from_think_code(cap: int, rng: random.Random, max_chars: int = 3000) -> list[dict]:
-    """OpenThoughts-114k: R1-style Thought/Solution, short rows only.
+_COMMENT_START = ("#", "//", "/*", "*", "--")
+_COMMENT_LINE = re.compile(r"^\s*(?://|#|--)(.*)$")
 
-    Long traces are *dropped*, not truncated: a clipped chain-of-thought
-    teaches the model to never reach an answer.
+
+def _prose(lines: list[str]) -> list[str]:
+    """Keep only lines that read as prose, not as code or ASCII art."""
+    out = []
+    for line in lines:
+        body = line.strip()
+        for marker in _COMMENT_START:
+            if body.startswith(marker):
+                body = body[len(marker):].strip()
+                break
+        words = re.findall(r"[A-Za-z]{2,}", body)
+        letters = sum(c.isalpha() for c in body)
+        if len(words) >= 4 and letters / max(1, len(body)) > 0.6:
+            out.append(body)
+    return out
+
+
+def _extract_thinking(code: str) -> tuple[str, str]:
+    """Move prose comments out of the code and into the thinking block.
+
+    Magicoder solutions explain themselves in comments -- `# Sort the list`,
+    `// The maximum product could come from the two most negative`. That is
+    real reasoning about the solution, so it is hoisted into `### Thinking:`
+    and the answer keeps only clean code. Nothing is invented: the same words
+    move slot. A banner of `###` or a license header is not prose and stays.
+    """
+    lines = code.splitlines()
+
+    # leading comment block first: it reads best as one contiguous thought
+    i = 0
+    while i < len(lines) and (not lines[i].strip() or lines[i].lstrip().startswith(_COMMENT_START)):
+        i += 1
+    head = _prose(lines[:i])
+    keep = lines[i:] if head else lines
+
+    # then any full-line prose comment inside the code
+    thought, body = list(head), []
+    for line in keep:
+        m = _COMMENT_LINE.match(line)
+        if m and _prose([m.group(1)]):
+            thought.append(m.group(1).strip())
+        else:
+            body.append(line)
+
+    # One stray comment is a note, not a plan: below two lines the code keeps
+    # its comments and no thinking block is emitted, so the answer stays intact.
+    if len(thought) < 2 or len(" ".join(thought)) < 60:
+        return "", code.strip()
+    return "\n".join(thought).strip(), "\n".join(body).strip()
+
+
+def from_code_magicoder(cap: int, rng: random.Random) -> list[dict]:
+    """Magicoder: short English programming problems + solutions.
+
+    Rows that do not fit the context budget are *dropped*, not clipped: a
+    solution cut mid-function teaches the model to stop mid-function. The
+    problem statement is filtered the same way, so nothing here is truncated.
     """
     from datasets import load_dataset
 
-    ds = load_dataset(DS_THINK, split="train", streaming=True)
+    ds = load_dataset(DS_CODE, split="train", streaming=True)
     rows, scanned = [], 0
     for row in ds:
         scanned += 1
-        conv = row.get("conversations") or []
-        if len(conv) < 2:
+        problem = canon.sanitize(row.get("problem"))
+        raw = row.get("solution") or ""
+        if not problem or len(problem) > B["msg"] or len(raw) > B["answer"]:
             continue
-        user = canon.sanitize(conv[0].get("value"))
-        raw_asst = conv[1].get("value") or ""
-        if not user or len(raw_asst) > max_chars:
+        thinking, body = _extract_thinking(raw)
+        sol = canon.sanitize(body)
+        if len(sol) < 60:
             continue
-
-        # Split on the template markers *before* sanitize strips them,
-        # otherwise the whole trace lands in the answer and the model never
-        # learns the "think, then answer" shape.
-        t_raw, a_raw = "", raw_asst
-        low_raw = raw_asst.lower()
-        for marker in ("<|end_of_thought|>", "<|begin_of_solution|>", "<|end_of_solution|>"):
-            pos = low_raw.find(marker)
-            if pos >= 0:
-                t_raw, a_raw = raw_asst[:pos], raw_asst[pos + len(marker):]
-                break
-        if not t_raw and "## solution" in low_raw:
-            pos = low_raw.index("## solution")
-            t_raw, a_raw = raw_asst[:pos], raw_asst[pos + len("## solution"):]
-
-        thinking = canon.sanitize(t_raw)
-        asst = canon.sanitize(a_raw)
-        if len(asst) < 40:
-            continue
-
-        domain = str(row.get("domain") or "")
-        is_code = "python function" in user.lower() or "code" in domain.lower()
-        if not (is_code or "math" in domain.lower()):
-            continue
-
         msgs = [
-            {"role": "user", "content": canon.clip(user, B["prompt"])},
-            {"role": "assistant", "thinking": canon.clip(thinking, B["think"]), "content": canon.clip(asst, B["answer"])},
+            {"role": "user", "content": problem},
+            {"role": "assistant",
+             "thinking": canon.clip(thinking, B["think"]),
+             "content": sol},
         ]
-        rows.append(_row(msgs, "think-code", "code" if is_code else "math-think"))
-        if len(rows) >= cap or scanned > cap * 40:
+        rows.append(_row(msgs, "code-magicoder", str(row.get("lang") or "code")))
+        if len(rows) >= cap or scanned > cap * 20:
             break
     return rows[:cap]
 
@@ -506,7 +547,7 @@ BUILDERS = {
     "agent-glaive": from_agent_glaive,
     "math-gsm8k": from_math_gsm8k,
     "math-instruct": from_math_instruct,
-    "think-code": from_think_code,
+    "code-magicoder": from_code_magicoder,
     "general": from_general,
 }
 

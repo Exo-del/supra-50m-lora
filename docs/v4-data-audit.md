@@ -83,16 +83,48 @@ boundaries and every slice still ends on a complete assistant turn.
 |---|---|---|
 | `agent-deepseek` | multi-turn tool calling with per-turn reasoning | 26% |
 | `agent-glaive` | tool calls with real tool responses | 18% |
-| `think-code` | R1-style Thought/Solution, short only | 16% |
+| `code-magicoder` | short programming tasks, prose comments as thinking | 14% |
 | `math-gsm8k` | short arithmetic CoT | 13% |
 | `math-instruct` | short CoT / program-of-thought | 11% |
-| `general` | no-tool answers (negative class) | 14% |
+| `general` | no-tool answers (negative class) | 15% |
 | `seed` | hand-written English anchors | 2% |
 
 Every row passes `canon.is_english()`; the build prints the reject count per
 source, and `data/mix_v4.report.json` records rows, tokens, share and rejects.
 
 Expected shortfall: `agent-deepseek` caps out around 1.5k slices (284
-trajectories) and `think-code` short traces are rare, so the realised total
-lands under the 6M token target. `agent-glaive` and `math-gsm8k` fill the rest;
-the report records the truth, the weights are only intent.
+trajectories), so the realised total lands under the 6M token target.
+`agent-glaive` and `math-gsm8k` fill the rest; the report records the truth, the
+weights are only intent.
+
+## 7. v4.1: the reasoning slot was empty
+
+The v4 run launched with `open-thoughts/OpenThoughts-114k` filling 16% of the
+budget. Sampled 120 rows through the datasets-server API:
+
+```
+assistant trace, chars:  median 24,357   p10 9,500   p90 61,627
+rows fitting a 3,000-char budget: 0 / 120
+```
+
+At a 1024-token context that source can only be used by cutting the chain of
+thought, which is the failure mode section 5 exists to avoid — so the honest
+result is **0 usable rows**, and the run trains with the reasoning slot empty
+(math only, 24% of budget instead of 40%).
+
+Replacement, measured the same way before switching:
+
+| candidate | median answer | fits 2,500 chars |
+|---|---|---|
+| `ise-uiuc/Magicoder-OSS-Instruct-75K` | 919 | 40/40 |
+| `m-a-p/CodeFeedback-Filtered-Instruction` | 1,253 | 38/40 |
+| `TIGER-Lab/MathInstruct` | 221 | 40/40 |
+| `AI-MO/NuminaMath-CoT` | — | dataset API 404 |
+
+`code-magicoder` now takes the code slot. Solutions longer than the answer
+budget, or problems longer than the prompt budget, are **dropped**, so nothing
+is clipped. Prose comments inside a solution (`# Sort the list`, `// The
+maximum product could come from the two most negative`) are hoisted into
+`### Thinking:` and the answer keeps clean code — the same words, moved to the
+slot where reasoning is supervised. That covers ~20% of rows; the rest stay
+content-only, because one stray comment is a note, not a plan.

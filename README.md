@@ -42,7 +42,7 @@ Two other defects found while re-reading the mixes:
 | `agent-glaive` | `glaiveai/glaive-function-calling-v2` | high-volume tool calls **with real tool responses**, so the model sees cause and effect |
 | `math-gsm8k` | `openai/gsm8k` | short clean CoT, `<<..=..>>` markers stripped |
 | `math-instruct` | `TIGER-Lab/MathInstruct` | short CoT / program-of-thought across maths |
-| `think-code` | `open-thoughts/OpenThoughts-114k` | R1-style Thought/Solution, **short rows only** |
+| `code-magicoder` | `ise-uiuc/Magicoder-OSS-Instruct-75K` | short English programming tasks; prose comments are hoisted into `### Thinking:` and the answer keeps clean code |
 | `general` | `databricks/databricks-dolly-15k` | no-tool answers: the negative class |
 | `seed` | `data/seed.jsonl` | hand-written English anchors |
 
@@ -54,9 +54,15 @@ the build prints the reject count per source.
 
 Truncating a chain-of-thought mid-way teaches the model to ramble and never
 conclude. Reasoning sources keep only rows whose **whole** trace fits the
-sequence budget (`max(3000 chars)` for `think-code`, `max_tokens` overall).
+sequence budget (`max_tokens` overall, plus per-field char caps), and a solution
+that does not fit is dropped rather than cut mid-function.
 Agentic rows are the opposite: they are multi-turn, so they are sliced at turn
 boundaries and every slice ends on a complete assistant turn.
+
+This is why `open-thoughts/OpenThoughts-114k` is not in the mix: its assistant
+traces have a median of 24.4k chars (p10 9.5k) and **0 of 120 sampled rows fit a
+3k-char budget**, so at 1024 tokens it can only be used by clipping the chain of
+thought — the exact failure mode above.
 
 ## Canonical markup instead of new special tokens
 

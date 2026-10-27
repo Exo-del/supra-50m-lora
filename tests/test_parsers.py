@@ -104,30 +104,29 @@ def test_mathinstruct_splits_reasoning_from_answer():
     assert "five times two" in last["thinking"]
 
 
-def test_think_code_splits_thought_before_sanitize():
-    code = ("```python\ndef solve(n: int) -> int:\n    total = 0\n"
-            "    for i in range(n):\n        total += i * 2\n    return total\n\n"
-            "print(solve(int(input())))\n```")
-    asst = "<|begin_of_thought|> Read n and double every index, then sum. " * 3 \
-        + "<|end_of_thought|><|begin_of_solution|>\n" + code
-    fake_dataset([{"conversations": [
-        {"from": "user",
-         "value": "Generate an executable Python function generated from the given prompt."},
-        {"from": "assistant", "value": asst}]}])
-    rows = pd.from_think_code(5, random.Random(0), max_chars=3000)
-    assert rows, "think-code produced no rows"
+def test_code_magicoder_splits_prose_comment_into_thinking():
+    code = ("# Approach: sort the array, then walk it once keeping a running sum.\n"
+            "# The answer is the maximum of that sum over all prefixes.\n"
+            "def solve(a):\n"
+            "    best = total = 0\n"
+            "    for x in sorted(a):\n"
+            "        total += x\n"
+            "        best = max(best, total)\n"
+            "    return best\n")
+    fake_dataset([{"problem": "Given an array, return the best prefix sum.", "solution": code, "lang": "python"}])
+    rows = pd.from_code_magicoder(5, random.Random(0))
+    assert rows, "magicoder produced no rows"
     last = rows[0]["messages"][-1]
-    assert last["thinking"], "thought section was not split out"
-    assert "def solve" in last["content"], "solution/code lost"
-    assert "begin_of_thought" not in canon.to_text(rows[0]["messages"])
+    assert "sort the array" in last["thinking"], "prose comment was not split into thinking"
+    assert "def solve" in last["content"], "code lost"
+    assert "# Approach" not in last["content"], "comment leaked into the answer"
+    assert rows[0]["domain"] == "python"
 
 
-def test_think_code_drops_long_traces_instead_of_truncating():
-    fake_dataset([{"conversations": [
-        {"from": "user",
-         "value": "Generate an executable Python function generated from the given prompt."},
-        {"from": "assistant", "value": "x" * 5000}]}])
-    assert not pd.from_think_code(5, random.Random(0), max_chars=3000)
+def test_code_magicoder_drops_overlong_rows_instead_of_truncating():
+    fake_dataset([{"problem": "p" * 5000, "solution": "def f(): pass", "lang": "python"},
+                  {"problem": "q", "solution": "x = 1\n" * 5000, "lang": "python"}])
+    assert not pd.from_code_magicoder(5, random.Random(0))
 
 
 def test_language_gate():
