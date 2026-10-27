@@ -37,6 +37,10 @@ _MULTI = re.compile(r"\n{3,}")
 # GSM8K calculator annotations: "<<12*2=24>>" is dropped, leaving the value
 # that already follows it in the text.
 _CALC = re.compile(r"<<[^<>]*>>")
+# Exotic line/paragraph separators (U+2028, U+2029, U+0085, VT, FF). json.dumps
+# leaves them raw, and str.splitlines() *does* split on them, so a single
+# U+2028 inside a GSM8K question corrupts every line-oriented reader.
+_SEPARATORS = re.compile("[\u2028\u2029\u0085\u000b\u000c]")
 _ENDTEXT = re.compile(r"<\|endoftext\|>")
 
 EN_STOP = frozenset(
@@ -62,6 +66,7 @@ def sanitize(text: str | None) -> str:
     text = _SQUARE.sub("", text)
     text = _ENDTEXT.sub("", text)
     text = text.replace("\r\n", "\n").replace("\u00a0", " ")
+    text = _SEPARATORS.sub("\n", text)
     text = _MULTI.sub("\n\n", _WS.sub("\n", text))
     return text.strip()
 

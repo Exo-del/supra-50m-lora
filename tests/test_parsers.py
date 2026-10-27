@@ -12,6 +12,7 @@ Each case guards a bug that actually bit during the v4 data build:
 
 from __future__ import annotations
 
+import json
 import pathlib
 import random
 import sys
@@ -164,6 +165,16 @@ def test_language_gate():
         "Je ne peux pas mettre à jour l'adresse de livraison parce que le système est hors "
         "service et vous devez appeler le service client demain matin, s'il vous plaît.")
     assert canon.is_english("3 + 4 = 7 and the answer is 7")
+
+
+def test_line_separators_are_normalised():
+    """A raw U+2028 is legal JSON but splits str.splitlines(): one bad GSM8K
+    question silently corrupted the mix file for every line-oriented reader."""
+    raw = "Clive opens a box.\u2028The box contains 6 blue balls."
+    clean = canon.sanitize(raw)
+    assert "\u2028" not in clean
+    line = json.dumps({"messages": [{"role": "user", "content": clean}]}, ensure_ascii=False)
+    assert len(line.splitlines()) == 1, "row still breaks line-oriented readers"
 
 
 def test_supervised_spans_only():

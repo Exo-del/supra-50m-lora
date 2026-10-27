@@ -128,7 +128,11 @@ def main() -> int:
     tok.padding_side = "right"
 
     buckets: dict[str, list] = defaultdict(list)
-    for line in Path(args.data).read_text(encoding="utf-8").splitlines():
+    # Iterate the handle: universal newlines split on \n/\r only, while
+    # str.splitlines() also splits on U+2028, which json.dumps does not escape.
+    with open(args.data, encoding="utf-8") as fh:
+        lines = fh.readlines()
+    for line in lines:
         if not line.strip():
             continue
         row = json.loads(line)
