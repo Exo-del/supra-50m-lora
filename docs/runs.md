@@ -169,3 +169,25 @@ question was untested until v4.2 — every other probe is single-turn.
    splits on it, so the mix file broke every line-oriented reader and killed
    the v4.2 eval with `Unterminated string`. Fixed in `canon.sanitize`, with a
    regression test.
+
+## Diagnosing the tool-call probe (v4.2 adapter)
+
+The probe failed with a terse system line ("you have access to
+update_shipping_location(location: str)"). Holding everything else fixed and
+changing only the system prompt:
+
+| prompt ending | output |
+|---|---|
+| `### Response:` + terse system | *"I'm sorry, but I don't have the capability to look up your shipping address…"* — refusal |
+| `### Response:` + JSON function schema | `update_shipping_location(` / `"location": "42main-st".json")` — a call, malformed |
+| `### Thinking:` + JSON function schema | *"Let me update the shipping location for this order using the given function."* — correct plan, no call yet |
+
+So the capability is there and it is **conditioned on the schema block**: every
+tool-calling row in the mix carries one, so a terse prompt is out of
+distribution and the refusal measures the probe, not the adapter. The probe now
+uses a schema prompt and ends at `### Response:`.
+
+What the adapter still gets wrong is the syntax: it emits `name(` then a JSON-ish
+argument blob that does not parse as `name({...})`. That is a 50M/r16 capacity
+limit on a structured output format, not a data problem — and it is the honest
+reason `tool-call` stays at 0 even with the right prompt.

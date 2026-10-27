@@ -49,12 +49,26 @@ def _stop(text: str) -> str:
     return text.strip()
 
 
+# The system prompt must carry a function schema: every tool-calling row in the
+# mix has one (glaive and deepseek both list the tools). A terse "you have access
+# to update_shipping_location(...)" prompt is out of distribution and the adapter
+# just refuses -- measuring that says nothing about the capability.
+_TOOL_SYS = (
+    "You are a helpful assistant with access to the following functions. "
+    "Use them if required -\n"
+    "{\n"
+    '  "name": "update_shipping_location",\n'
+    '  "description": "Update the shipping location for an order",\n'
+    '  "parameters": {"type": "object", "properties": {"location": {"type": "string"}}, '
+    '"required": ["location"]}\n'
+    "}\n"
+)
+
 PROBES = [
     ("no-tool", canon.M["user"] + "What is a language model?\n" + canon.M["response"]),
     (
         "tool-call",
-        canon.M["system"]
-        + "You are a customer service agent with access to update_shipping_location(location: str).\n"
+        canon.M["system"] + _TOOL_SYS
         + canon.M["user"]
         + "Please update my shipping address to 42 Main St, Casablanca.\n"
         + canon.M["response"],
