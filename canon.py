@@ -34,6 +34,22 @@ _TAGS = re.compile(
 _SQUARE = re.compile(r"\[/?INST\]|<<SYS>>|</?s>")
 _WS = re.compile(r"[ \t]+\n")
 _MULTI = re.compile(r"\n{3,}")
+# GSM8K calculator annotations: "<<12*2=24>>" -> "24"
+_CALC = re.compile(r"<<[^>]*=([^>]*)>>")
+_ENDTEXT = re.compile(r"<\|endoftext\|>")
+
+EN_STOP = frozenset(
+    "the of and to in is that for it as with was on be by this are or from at "
+    "an not have but you we they he she his her its their our your can will "
+    "would should could there what which who when where how why".split()
+)
+FOREIGN_STOP = {
+    "pt": frozenset("que não uma para você como com dos das são isso então mas muito também pelo pela ao se".split()),
+    "es": frozenset("que no una para usted como con los las son esto entonces pero muy también por del se".split()),
+    "fr": frozenset("que pas une pour vous comme avec les des sont ce alors mais très aussi par est dans sur".split()),
+    "de": frozenset("der die das und ist nicht ein eine mit für auf von zu den dem sich auch".split()),
+    "it": frozenset("che non una per come con gli delle sono questo allora ma molto anche del nel".split()),
+}
 
 
 def sanitize(text: str | None) -> str:
@@ -43,9 +59,15 @@ def sanitize(text: str | None) -> str:
     text = _ANGLE.sub("", text)
     text = _TAGS.sub("", text)
     text = _SQUARE.sub("", text)
+    text = _ENDTEXT.sub("", text)
     text = text.replace("\r\n", "\n").replace("\u00a0", " ")
     text = _MULTI.sub("\n\n", _WS.sub("\n", text))
     return text.strip()
+
+
+def strip_calc_markers(text: str) -> str:
+    """GSM8K writes `<<12*2=24>>`; keep only the computed value."""
+    return _CALC.sub(r"\1", text or "")
 
 
 def clip(text: str, limit: int) -> str:
@@ -60,13 +82,40 @@ def clip(text: str, limit: int) -> str:
     return cut.rstrip() + " …"
 
 
+def is_english(text: str, min_words: int = 30) -> bool:
+    """Cheap language gate: accented-letter density + stopword profile.
+
+    English is the only language this adapter should learn, so every source
+    row passes through here. Math/LaTeX rows are mostly ASCII and survive;
+    Portuguese/Spanish/French prose does not.
+    """
+    if not text:
+        return False
+    letters = [c for c in text if c.isalpha()]
+    if not letters:
+        return False
+    non_ascii = sum(1 for c in letters if ord(c) > 127) / len(letters)
+    if non_ascii > 0.03:
+        return False
+
+    words = re.findall(r"[a-z']+", text.lower())[:800]
+    if len(words) < min_words:
+        return True  # too short to judge; keep short answers/code
+    en = sum(w in EN_STOP for w in words)
+    for stops in FOREIGN_STOP.values():
+        hits = sum(w in stops for w in words)
+        if hits >= 6 and hits > 0.6 * en:
+            return False
+    return True
+
+
 def tool_calls_to_text(tool_calls: list | None) -> str:
     """Serialise OpenAI-style tool_calls into a readable canonical block."""
     if not tool_calls:
         return ""
     blocks = []
     for call in tool_calls:
-        fn = (call or {}).get("function") or {}
+        fn = (call or {}).get("function") or call or {}
         name = fn.get("name") or "unknown"
         raw = fn.get("arguments")
         try:

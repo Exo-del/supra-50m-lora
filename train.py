@@ -17,6 +17,7 @@ import json
 import math
 import os
 import random
+import shutil
 import sys
 import time
 from pathlib import Path
@@ -233,6 +234,20 @@ def train(args) -> None:
     total = sum(p.numel() for p in model.parameters())
     print(f"[*] LoRA trainable: {trainable:,} / {total:,} ({100 * trainable / total:.2f}%)")
 
+    if args.resume:
+        from peft import PeftModel
+
+        cands = [p for p in args.out.glob("*") if (p / "adapter_config.json").exists()]
+        if (args.out / "adapter_config.json").exists():
+            cands.append(args.out)
+        cands.sort(key=lambda p: p.stat().st_mtime)
+        if cands:
+            src = cands[-1]
+            model = PeftModel.from_pretrained(model, str(src), is_trainable=True)
+            print(f"[*] resumed adapter <- {src}")
+        else:
+            print("[!] --resume given but no adapter found; starting fresh")
+
     params = [p for p in model.parameters() if p.requires_grad]
     opt = torch.optim.AdamW(params, lr=args.lr, betas=(0.9, 0.95), weight_decay=args.weight_decay)
     if args.grad_checkpoint:
@@ -265,6 +280,7 @@ def train(args) -> None:
 
     order = list(range(len(train_set)))
     step, micro, t0 = 0, 0, time.time()
+    tokens_seen = 0
     model.train()
 
     for epoch in range(1, args.epochs + 1):
@@ -293,6 +309,7 @@ def train(args) -> None:
             running += loss.item() * args.grad_accum
             seen += 1
             micro += 1
+            tokens_seen += int(mask.sum())
 
             if micro % args.grad_accum == 0:
                 for g in opt.param_groups:
@@ -307,6 +324,16 @@ def train(args) -> None:
                     opt.step()
                 opt.zero_grad(set_to_none=True)
                 step += 1
+
+                if args.save_steps and step % args.save_steps == 0:
+                    snap = args.out / f"step-{step:05d}"
+                    snap.mkdir(parents=True, exist_ok=True)
+                    model.save_pretrained(snap)
+                    snaps = sorted((p for p in args.out.glob("step-*") if p.is_dir()),
+                                   key=lambda p: p.stat().st_mtime)
+                    for old in snaps[:-2]:
+                        shutil.rmtree(old, ignore_errors=True)
+                    print(f"[+] snapshot -> {snap}")
 
                 if step % args.log_every == 0 or step == 1:
                     speed = (time.time() - t0) / max(1, step)
@@ -343,7 +370,10 @@ def train(args) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     model.save_pretrained(out_dir)
     tok.save_pretrained(out_dir)
+    elapsed = time.time() - t0
     print(f"[+] Adapter saved -> {out_dir}")
+    print(f"[+] {step} optimizer steps | {tokens_seen:,} tokens seen | "
+          f"{elapsed / 60:.1f} min | {tokens_seen / max(1e-9, elapsed):,.0f} tok/s")
 
     if args.merge:
         merged = model.merge_and_unload()
@@ -406,6 +436,10 @@ def main() -> int:
     ap.add_argument("--device", default="auto", help="auto | cpu | cuda")
     ap.add_argument("--grad-checkpoint", action="store_true", help="trade speed for activation memory")
     ap.add_argument("--ckpt-every", type=int, default=1, help="save an adapter checkpoint every N epochs")
+    ap.add_argument("--save-steps", type=int, default=0,
+                    help="also snapshot the adapter every N optimizer steps (0 = off)")
+    ap.add_argument("--resume", action="store_true",
+                    help="continue from the newest adapter in --out")
     ap.add_argument("--merge", action="store_true", help="also save merged fp32 weights")
     ap.add_argument("--demo", action="store_true", help="generate a sample after training")
     ap.add_argument("--force", action="store_true", help="re-download base weights")

@@ -9,3 +9,4 @@ __pycache__/
 # generated data (keep only the hand-written seed set)
 data/*.jsonl
 !data/seed.jsonl
+data/*.report.json

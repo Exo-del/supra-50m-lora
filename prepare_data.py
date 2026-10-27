@@ -1,19 +1,47 @@
-"""Sample, clean and mix two Hugging Face datasets into canonical JSONL.
+"""Build an English-only mixed SFT set for Supra-50M-Base.
 
-Sources
-  1. Davizig10jojo/Kimi-K3-And-DeepSeek-V4-Pro-0813-Distillation-in-PT-BR
-     58 rows, pt-BR, long chain-of-thought distillations.
-  2. zake7749/deepseek-v4-pro-agent-tool-calling-trajectory
-     2510 rows, en, multi-turn tool-calling agent traces.
+Goal of the mix
+    (a) multi-turn agentic tool calling,
+    (b) structured reasoning in the DeepSeek "thinking then answer" shape,
+    (c) a logic floor from math and code traces,
+    (d) a no-tool negative class so the model does not call a function for
+        every prompt.
 
-Both are far too big per row for a 50M model on CPU (DS2 median is
-~16k chars / 11 turns), so every row is clipped on sentence boundaries
-before it enters the mix. Sampling is domain-stratified and capped per
-source so no single style dominates.
+Sources (all English)
+    agent-deepseek  zake7749/deepseek-v4-pro-agent-tool-calling-trajectory
+                    multi-turn tool-calling trajectories with per-turn
+                    reasoning, 5 domains, heavily duplicated (284 unique ids
+                    behind 2510 rows) -> dedupe by id, then slice by turn.
+    agent-glaive    glaiveai/glaive-function-calling-v2
+                    <functioncall> / FUNCTION RESPONSE traces: real tool
+                    results, so the model sees cause and effect, not just
+                    call syntax.
+    math-gsm8k      openai/gsm8k
+                    short clean CoT, `<<..=..>>` calculator markers stripped.
+    math-instruct   TIGER-Lab/MathInstruct
+                    short CoT / program-of-thought answers across maths.
+    think-code      open-thoughts/OpenThoughts-114k
+                    R1-style Thought/Solution traces, FILTERED TO SHORT ONES.
+    general         databricks/databricks-dolly-15k
+                    no-tool answers (negative class), context-free only.
+    seed            data/seed.jsonl (local anchors, hand written)
 
-Usage:
-    python prepare_data.py                     # defaults, writes data/mix.jsonl
-    python prepare_data.py --pt 10 --agent 10 --seed 20
+Dropped on purpose
+    Davizig10jojo/Kimi-K3-And-DeepSeek-V4-Pro-0813-Distillation-in-PT-BR
+    was in v1-v3 of this mix. It is Portuguese, the target is an English
+    agentic/reasoning adapter, and 58 rows buy ~18% loss reduction on a slice
+    that is 3% of the data. Removed in v4; see README "What changed in v4".
+
+Why short traces are filtered, not clipped
+    Truncating a chain-of-thought mid-way teaches the model to ramble and
+    never conclude. For reasoning sources we keep only rows whose *whole*
+    trace fits the sequence budget. Agentic rows are different: they are
+    multi-turn, so they are sliced at turn boundaries and still end on a
+    complete assistant turn.
+
+Usage
+    python prepare_data.py --profile kaggle --target-tokens 6000000
+    python prepare_data.py --profile cpu --target-tokens 400000 --only seed,general
 """
 
 from __future__ import annotations
@@ -22,6 +50,7 @@ import argparse
 import hashlib
 import json
 import random
+import re
 import statistics as stats
 from collections import Counter
 from pathlib import Path
@@ -32,23 +61,39 @@ ROOT = Path(__file__).resolve().parent
 OUT = ROOT / "data" / "mix.jsonl"
 SEED_FILE = ROOT / "data" / "seed.jsonl"
 
-DS_PT = "Davizig10jojo/Kimi-K3-And-DeepSeek-V4-Pro-0813-Distillation-in-PT-BR"
 DS_AGENT = "zake7749/deepseek-v4-pro-agent-tool-calling-trajectory"
+DS_GLAIVE = "glaiveai/glaive-function-calling-v2"
+DS_GSM8K = "openai/gsm8k"
+DS_MATHIN = "TIGER-Lab/MathInstruct"
+DS_THINK = "open-thoughts/OpenThoughts-114k"
+DS_GENERAL = "databricks/databricks-dolly-15k"
+
+# Token share per source. Renormalised over whichever sources are enabled.
+WEIGHTS = {
+    "agent-deepseek": 0.26,
+    "agent-glaive": 0.18,
+    "math-gsm8k": 0.13,
+    "math-instruct": 0.11,
+    "think-code": 0.16,
+    "general": 0.14,
+    "seed": 0.02,
+}
 
 # Clip budgets in chars per profile.
 #   cpu   : ~330 tokens/row, fits max_seq 384 on a 12s/step CPU
-#   colab : full 1024 ctx, light clipping only
+#   kaggle: full 1024 ctx, light clipping only
 PROFILES = {
     "cpu": dict(think=300, answer=460, prompt=180, sys_pt=160,
                 sys_agent=200, msg=240, reason=200, tool=160, budget=850,
-                slice_ctx=850),
-    "colab": dict(think=900, answer=1600, prompt=320, sys_pt=420,
-                  sys_agent=520, msg=900, reason=700, tool=520, budget=2600,
-                  slice_ctx=1700),
+                slice_ctx=850, max_tokens=384),
+    "kaggle": dict(think=900, answer=1600, prompt=320, sys_pt=420,
+                   sys_agent=520, msg=900, reason=700, tool=520, budget=2600,
+                   slice_ctx=1700, max_tokens=1024),
 }
-B = dict(PROFILES["cpu"])
+B = dict(PROFILES["kaggle"])
 
 
+# --------------------------------------------------------------- helpers
 def slice_turns(msgs: list[dict], k: int, ctx_chars: int) -> list[list[dict]]:
     """Emit up to k examples that each *end* on a different assistant turn.
 
@@ -78,16 +123,9 @@ def slice_turns(msgs: list[dict], k: int, ctx_chars: int) -> list[list[dict]]:
     return out
 
 
-def _dedupe(rows: list[dict]) -> list[dict]:
-    """Drop rows whose rendered content repeats (the agent set has clones)."""
-    out, seen = [], set()
-    for row in rows:
-        digest = hashlib.sha1(" ".join(canon.to_text(row["messages"]).split()).encode()).hexdigest()
-        if digest in seen:
-            continue
-        seen.add(digest)
-        out.append(row)
-    return out
+def _digest(msgs: list[dict]) -> str:
+    txt = " ".join(canon.to_text(msgs).split())
+    return hashlib.sha1(txt.encode()).hexdigest()
 
 
 def _stratified(rows: list[dict], limit: int, key: str, per_group: int, rng: random.Random) -> list[dict]:
@@ -98,8 +136,6 @@ def _stratified(rows: list[dict], limit: int, key: str, per_group: int, rng: ran
     for items in buckets.values():
         rng.shuffle(items)
 
-    # Round-robin over domains already balances the mix, so scale the cap
-    # with the requested limit instead of letting 3-per-domain throttle it.
     per_group = max(per_group, -(-limit // max(1, len(buckets))))
 
     picked, names = [], list(buckets)
@@ -117,65 +153,31 @@ def _stratified(rows: list[dict], limit: int, key: str, per_group: int, rng: ran
     return picked
 
 
-def from_pt(limit: int, rng: random.Random) -> list[dict]:
-    """PT-BR reasoning distillations: keep the shape, shrink the length."""
-    from datasets import load_dataset
-
-    ds = load_dataset(DS_PT, split="train")
-    rows = []
-    for row in ds:
-        think = canon.sanitize(row.get("thinking"))
-        answer = canon.sanitize(row.get("answer"))
-        user = canon.sanitize(row.get("user_prompt"))
-        system = canon.sanitize(row.get("system_prompt"))
-
-        if len(think) < 120 or len(answer) < 120:
-            continue
-
-        msgs = []
-        if system and len(system) > 40:
-            msgs.append({"role": "system", "content": canon.clip(system, B["sys_pt"])})
-        msgs.append({"role": "user", "content": canon.clip(user, B["prompt"])})
-        msgs.append(
-            {
-                "role": "assistant",
-                "thinking": canon.clip(think, B["think"]),
-                "content": canon.clip(answer, B["answer"]),
-            }
-        )
-        rows.append(
-            {
-                "messages": msgs,
-                "source": "pt-br-reasoning",
-                "lang": "pt",
-                "domain": row.get("domain") or "na",
-            }
-        )
-    return _stratified(_dedupe(rows), limit, "domain", per_group=3, rng=rng)
+def _row(msgs: list[dict], source: str, domain: str) -> dict:
+    return {"messages": msgs, "source": source, "lang": "en", "domain": domain}
 
 
-def from_agent(limit: int, rng: random.Random, slice_k: int = 1) -> list[dict]:
-    """English tool-calling traces, score-filtered.
-
-    slice_k == 1 : keep short trajectories only and trim to one budgeted row.
-    slice_k  > 1 : use the full trajectory, then emit turn-level slices so
-                   long multi-turn traces become many usable examples.
-    """
+# --------------------------------------------------------------- sources
+def from_agent_deepseek(cap: int, rng: random.Random, slice_k: int = 4) -> list[dict]:
+    """English multi-turn trajectories: reasoning + tool calls + tool results."""
     from datasets import load_dataset
 
     ds = load_dataset(DS_AGENT, split="train")
-    rows = []
+    rows, seen_ids = [], set()
     for row in ds:
         if (row.get("score") or 0) < 0.66:
             continue
-        turns = row.get("num_turns") or 0
-        if turns < 2 or (slice_k <= 1 and turns > 6):
+        if (row.get("language") or "en") != "en":
+            continue
+        rid = row.get("id")
+        if rid in seen_ids:  # 2510 rows / 284 ids: clones add nothing
+            continue
+        seen_ids.add(rid)
+        if (row.get("num_turns") or 0) < 2:
             continue
 
         msgs = []
-        spent = 0
-        limit_msgs = len(row["messages"]) if slice_k > 1 else 8
-        for msg in row["messages"][:limit_msgs]:
+        for msg in row["messages"]:
             role = (msg.get("role") or "").lower()
             content = canon.sanitize(msg.get("content"))
             reasoning = canon.sanitize(msg.get("reasoning"))
@@ -197,31 +199,205 @@ def from_agent(limit: int, rng: random.Random, slice_k: int = 1) -> list[dict]:
                 entry = {"role": "tool", "content": canon.clip(content, B["tool"]), "name": msg.get("name")}
             else:
                 continue
-
-            cost = len(entry.get("content") or "") + len(entry.get("thinking") or "")
-            # For single-example mode, stop at the char budget; in slicing
-            # mode the per-slice context window enforces it instead.
-            if slice_k <= 1 and msgs and spent + cost > B["budget"]:
-                break
             msgs.append(entry)
-            spent += cost
 
-        # Keep only trajectories that end on an assistant turn.
         while msgs and msgs[-1].get("role") != "assistant":
             msgs.pop()
-        if len([m for m in msgs if m.get("role") == "assistant"]) == 0:
+        if not any(m.get("role") == "assistant" for m in msgs):
             continue
 
-        for variant in slice_turns(msgs, slice_k, B.get("slice_ctx", B["budget"])):
-            rows.append(
-                {
-                    "messages": variant,
-                    "source": "agent-tool",
-                    "lang": "en",
-                    "domain": row.get("domain") or "na",
-                }
-            )
-    return _stratified(_dedupe(rows), limit, "domain", per_group=4, rng=rng)
+        for variant in slice_turns(msgs, slice_k, B["slice_ctx"]):
+            rows.append(_row(variant, "agent-deepseek", row.get("domain") or "na"))
+        if len(rows) >= cap:
+            break
+    return rows[:cap]
+
+
+_FN_CALL = re.compile(r"<functioncall>\s*(\{.*?\})\s*</functioncall>", re.S)
+_GLAIVE_ROLE = re.compile(r"^(SYSTEM|USER|ASSISTANT|FUNCTION RESPONSE):", re.M)
+
+
+def from_agent_glaive(cap: int, rng: random.Random, slice_k: int = 3) -> list[dict]:
+    """glaive-v2: call -> FUNCTION RESPONSE -> answer. Real tool results."""
+    from datasets import load_dataset
+
+    ds = load_dataset(DS_GLAIVE, split="train")
+    rows = []
+    for row in ds:
+        chat = row.get("chat") or ""
+        if "<functioncall>" not in chat and "FUNCTION RESPONSE" not in chat:
+            continue
+
+        msgs = []
+        sys_txt = canon.sanitize((row.get("system") or "").replace("SYSTEM:", "", 1))
+        if sys_txt:
+            msgs.append({"role": "system", "content": canon.clip(sys_txt, B["sys_agent"])})
+
+        # split the flat transcript into role blocks
+        parts = _GLAIVE_ROLE.split(chat)
+        for i in range(1, len(parts) - 1, 2):
+            role, body = parts[i], canon.sanitize(parts[i + 1])
+            if not body:
+                continue
+            if role == "USER":
+                msgs.append({"role": "user", "content": canon.clip(body, B["msg"])})
+            elif role == "FUNCTION RESPONSE":
+                last = next((m for m in reversed(msgs) if m.get("tool_calls")), None)
+                name = ((last or {}).get("tool_calls") or [{}])[0].get("function", {}).get("name")
+                msgs.append({"role": "tool", "content": canon.clip(body, B["tool"]), "name": name})
+            elif role == "ASSISTANT":
+                calls = []
+                for blob in _FN_CALL.findall(body):
+                    try:
+                        obj = json.loads(blob)
+                    except json.JSONDecodeError:
+                        continue
+                    calls.append({"function": {"name": obj.get("name"), "arguments": obj.get("arguments")}})
+                text = _FN_CALL.sub("", body).strip()
+                entry = {"role": "assistant", "content": canon.clip(text, B["answer"])}
+                if calls:
+                    entry["tool_calls"] = calls
+                if not entry["content"] and not calls:
+                    continue
+                msgs.append(entry)
+            elif role == "SYSTEM":
+                msgs.append({"role": "system", "content": canon.clip(body, B["sys_agent"])})
+
+        while msgs and msgs[-1].get("role") != "assistant":
+            msgs.pop()
+        if not any(m.get("role") == "assistant" for m in msgs):
+            continue
+
+        domain = "tool-multi" if any(m.get("role") == "tool" for m in msgs) else "no-tool"
+        for variant in slice_turns(msgs, slice_k, B["slice_ctx"]):
+            rows.append(_row(variant, "agent-glaive", domain))
+        if len(rows) >= cap:
+            break
+    return rows[:cap]
+
+
+def from_math_gsm8k(cap: int, rng: random.Random) -> list[dict]:
+    """GSM8K: short grade-school CoT. Thinking = steps, answer = final line."""
+    from datasets import load_dataset
+
+    ds = load_dataset(DS_GSM8K, "main", split="train")
+    rows = []
+    for row in ds:
+        q = canon.sanitize(row.get("question"))
+        ans = canon.sanitize(canon.strip_calc_markers(row.get("answer") or ""))
+        if not q or "####" not in ans:
+            continue
+        steps, _, final = ans.rpartition("####")
+        steps, final = steps.strip(), final.strip()
+        if len(steps) < 60:
+            continue
+        msgs = [
+            {"role": "user", "content": canon.clip(q, B["prompt"])},
+            {"role": "assistant", "thinking": canon.clip(steps, B["think"]), "content": final},
+        ]
+        rows.append(_row(msgs, "math-gsm8k", "arithmetic"))
+        if len(rows) >= cap:
+            break
+    return rows[:cap]
+
+
+def from_math_instruct(cap: int, rng: random.Random) -> list[dict]:
+    """MathInstruct: short CoT / program-of-thought across maths."""
+    from datasets import load_dataset
+
+    ds = load_dataset(DS_MATHIN, split="train")
+    rows = []
+    for row in ds:
+        q = canon.sanitize(row.get("instruction"))
+        out = canon.sanitize(row.get("output"))
+        if not q or len(out) < 80:
+            continue
+        if "the answer is" in out.lower():
+            steps, _, final = out.rpartition("he answer is")
+            thinking, answer = steps.rstrip(" .") + " .", final.strip()
+            if not thinking.strip():
+                thinking, answer = "", out
+        else:
+            thinking, answer = "", out
+        msgs = [
+            {"role": "user", "content": canon.clip(q, B["prompt"])},
+            {"role": "assistant", "thinking": canon.clip(thinking, B["think"]), "content": canon.clip(answer, B["answer"])},
+        ]
+        src_file = str(row.get("source") or "math")
+        domain = "code" if "code" in src_file.lower() else "math"
+        rows.append(_row(msgs, "math-instruct", domain))
+        if len(rows) >= cap:
+            break
+    return rows[:cap]
+
+
+def from_think_code(cap: int, rng: random.Random, max_chars: int = 3000) -> list[dict]:
+    """OpenThoughts-114k: R1-style Thought/Solution, short rows only.
+
+    Long traces are *dropped*, not truncated: a clipped chain-of-thought
+    teaches the model to never reach an answer.
+    """
+    from datasets import load_dataset
+
+    ds = load_dataset(DS_THINK, split="train", streaming=True)
+    rows, scanned = [], 0
+    for row in ds:
+        scanned += 1
+        conv = row.get("conversations") or []
+        if len(conv) < 2:
+            continue
+        user = canon.sanitize(conv[0].get("value"))
+        asst = canon.sanitize(conv[1].get("value"))
+        if not user or len(asst) < 120 or len(asst) > max_chars:
+            continue
+        domain = str(row.get("domain") or "")
+        is_code = "python function" in user.lower() or "code" in domain.lower()
+        if not (is_code or "math" in domain.lower()):
+            continue
+
+        # split Thought / Solution if the template markers survived
+        thinking, answer = "", asst
+        low = asst.lower()
+        if "## solution" in low:
+            idx = low.index("## solution")
+            thinking, answer = asst[:idx].strip(), asst[idx + len("## solution"):].strip()
+        if not answer:
+            answer = asst
+        msgs = [
+            {"role": "user", "content": canon.clip(user, B["prompt"])},
+            {"role": "assistant", "thinking": canon.clip(thinking, B["think"]), "content": canon.clip(answer, B["answer"])},
+        ]
+        rows.append(_row(msgs, "think-code", "code" if is_code else "math-think"))
+        if len(rows) >= cap or scanned > cap * 40:
+            break
+    return rows[:cap]
+
+
+def from_general(cap: int, rng: random.Random) -> list[dict]:
+    """General English instruction data, no tools.
+
+    Serves as the negative class: without it the agent rows teach the model
+    to emit a tool call for *every* prompt, including plain questions.
+    """
+    from datasets import load_dataset
+
+    ds = load_dataset(DS_GENERAL, split="train")
+    rows = []
+    for row in ds:
+        instr = canon.sanitize(row.get("instruction"))
+        resp = canon.sanitize(row.get("response"))
+        if not instr or len(resp) < 60:
+            continue
+        if row.get("context"):
+            continue  # context-grounded rows are summarisation, not Q&A
+        msgs = [
+            {"role": "user", "content": canon.clip(instr, 200)},
+            {"role": "assistant", "content": canon.clip(resp, 340)},
+        ]
+        rows.append(_row(msgs, "general", row.get("category") or "general"))
+        if len(rows) >= cap:
+            break
+    return rows[:cap]
 
 
 def from_seed(rng: random.Random) -> list[dict]:
@@ -235,11 +411,22 @@ def from_seed(rng: random.Random) -> list[dict]:
         row = json.loads(line)
         msgs = canon.normalize_record(row)
         if msgs:
-            rows.append({"messages": msgs, "source": "seed", "lang": "en", "domain": "general"})
+            rows.append(_row(msgs, "seed", "general"))
     rng.shuffle(rows)
     return rows
 
 
+BUILDERS = {
+    "agent-deepseek": from_agent_deepseek,
+    "agent-glaive": from_agent_glaive,
+    "math-gsm8k": from_math_gsm8k,
+    "math-instruct": from_math_instruct,
+    "think-code": from_think_code,
+    "general": from_general,
+}
+
+
+# --------------------------------------------------------------- budget
 def token_len(msgs: list[dict], tok) -> int:
     n = 0
     for seg in canon.render(msgs):
@@ -247,97 +434,186 @@ def token_len(msgs: list[dict], tok) -> int:
     return n
 
 
+def take_budget(cands: list[dict], budget: int, tok, rng: random.Random, max_len: int) -> tuple[list[dict], dict]:
+    """Shuffle, tokenize, keep complete rows until the token budget is met."""
+    rng.shuffle(cands)
+    kept, stats_ = [], Counter()
+    spent = 0
+    for row in cands:
+        if spent >= budget:
+            break
+        if row.get("_dupe"):
+            stats_["dupe"] += 1
+            continue
+        n = token_len(row["messages"], tok)
+        if n > max_len:
+            stats_["overlong"] += 1
+            continue
+        if not canon.is_english(canon.to_text(row["messages"])):
+            stats_["not_english"] += 1
+            continue
+        row["tokens"] = n
+        kept.append(row)
+        spent += n
+    stats_["tokens"] = spent
+    return kept, stats_
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--pt", type=int, default=14, help="rows from the PT-BR reasoning set")
-    ap.add_argument("--agent", type=int, default=12, help="rows from the tool-calling set")
-    ap.add_argument("--seed", type=int, default=24, help="rows from data/seed.jsonl")
-    ap.add_argument("--profile", choices=sorted(PROFILES), default="cpu",
-                    help="clip budget preset: cpu (max_seq 384) or colab (max_seq 1024)")
-    ap.add_argument("--pt-repeat", type=int, default=1, help="oversample the small PT set")
-    ap.add_argument("--seed-repeat", type=int, default=1, help="oversample the local seed set")
-    ap.add_argument("--slice-turns", type=int, default=1,
-                    help="split each agent trajectory into up to N turn-level examples")
-    ap.add_argument("--max-tokens", type=int, default=384, help="drop rows longer than this")
-    ap.add_argument("--val-frac", type=float, default=0.12,
-                    help="held-out fraction; written to <out>.val.jsonl")
+    ap.add_argument("--profile", choices=sorted(PROFILES), default="kaggle")
+    ap.add_argument("--target-tokens", type=int, default=6_000_000,
+                    help="total tokens of unique training data to build")
+    ap.add_argument("--only", default="", help="comma list of sources to keep")
+    ap.add_argument("--skip", default="", help="comma list of sources to skip")
+    ap.add_argument("--cap-per-source", type=int, default=20000,
+                    help="max candidate rows gathered per source before budgeting")
+    ap.add_argument("--slice-turns", type=int, default=4,
+                    help="turn-level slices per agentic trajectory")
+    ap.add_argument("--val-frac", type=float, default=0.05)
+    ap.add_argument("--seed-repeat", type=int, default=1)
     ap.add_argument("--rng-seed", type=int, default=42)
+    ap.add_argument("--max-tokens", type=int, default=0, help="0 = profile default")
     ap.add_argument("--out", type=Path, default=OUT)
     args = ap.parse_args()
 
     from transformers import AutoTokenizer
 
     B.update(PROFILES[args.profile])
-    if args.profile == "colab" and args.max_tokens == 384:
-        args.max_tokens = 1024
-    print(f"[*] profile={args.profile} slice_turns={args.slice_turns} max_tokens={args.max_tokens}")
-
+    max_len = args.max_tokens or B["max_tokens"]
     tok = AutoTokenizer.from_pretrained(ROOT / "model")
     rng = random.Random(args.rng_seed)
 
-    print("[*] sampling PT-BR reasoning ...")
-    pt = from_pt(args.pt, rng)
-    print(f"    kept {len(pt)}")
-    print("[*] sampling agent tool-calling ...")
-    agent = from_agent(args.agent, rng, slice_k=args.slice_turns)
-    print(f"    kept {len(agent)}")
-    print("[*] sampling local seed ...")
-    seed = from_seed(rng)[: args.seed]
-    print(f"    kept {len(seed)}")
+    enabled = [s for s in WEIGHTS if s not in ("seed",)]
+    if args.only:
+        want = {s.strip() for s in args.only.split(",") if s.strip()}
+        enabled = [s for s in enabled if s in want]
+    if args.skip:
+        drop = {s.strip() for s in args.skip.split(",") if s.strip()}
+        enabled = [s for s in enabled if s not in drop]
+    unknowns = set(args.only.split(",")) | set(args.skip.split(","))
+    bad = {u.strip() for u in unknowns if u.strip()} - set(WEIGHTS)
+    if bad:
+        raise SystemExit(f"[!] unknown source(s): {sorted(bad)}  (known: {sorted(WEIGHTS)})")
 
-    records, seen, dropped, overlong = [], set(), 0, 0
-    for row in pt + agent + seed:
-        text = canon.to_text(row["messages"])
-        # Hash the whole rendered row: system prompts repeat across rows,
-        # so prefix-only hashing would falsely merge distinct examples.
-        digest = hashlib.sha1(" ".join(text.split()).encode()).hexdigest()
-        if digest in seen:
-            dropped += 1
+    only = {s.strip() for s in args.only.split(",") if s.strip()}
+    seed_on = (not only) or ("seed" in only)
+    weight_sum = sum(WEIGHTS[s] for s in enabled) + (WEIGHTS["seed"] if seed_on else 0)
+
+    print(f"[*] profile={args.profile} max_tokens={max_len} target={args.target_tokens:,} tokens")
+    print(f"[*] sources: {enabled}{' + seed' if seed_on else ''}")
+
+    per_source: dict[str, list[dict]] = {}
+    report = {}
+    for src in enabled:
+        budget = int(args.target_tokens * WEIGHTS[src] / weight_sum)
+        print(f"[*] {src}: budget {budget:,} tokens ...", flush=True)
+        try:
+            if src.startswith("agent-"):
+                cands = BUILDERS[src](args.cap_per_source, rng, slice_k=args.slice_turns)
+            else:
+                cands = BUILDERS[src](args.cap_per_source, rng)
+        except Exception as exc:  # network / dataset rename: keep going
+            print(f"    [!] source failed: {type(exc).__name__}: {exc}")
+            report[src] = {"error": str(exc)}
             continue
-        n = token_len(row["messages"], tok)
-        if n > args.max_tokens:
-            overlong += 1
-            continue
-        seen.add(digest)
-        row["tokens"] = n
-        records.append(row)
 
-    # Upweighting happens *after* dedupe, so repeats survive as real repeats
-    # rather than being collapsed by the hash filter.
-    for src, times in (("pt-br-reasoning", args.pt_repeat), ("seed", args.seed_repeat)):
-        base = [r for r in records if r["source"] == src]
-        for _ in range(max(0, times - 1)):
-            records.extend({**r} for r in base)
+        # global dedupe inside the source
+        seen, uniq = set(), []
+        for row in cands:
+            d = _digest(row["messages"])
+            if d in seen:
+                row["_dupe"] = True
+            else:
+                seen.add(d)
+            uniq.append(row)
 
+        kept, stats_ = take_budget(uniq, budget, tok, rng, max_len)
+        per_source[src] = kept
+        report[src] = {
+            "candidates": len(cands),
+            "kept": len(kept),
+            "tokens": stats_["tokens"],
+            "not_english": stats_["not_english"],
+            "overlong": stats_["overlong"],
+            "dupes": len(cands) - len(seen),
+        }
+        print(f"    kept {len(kept)} rows / {stats_['tokens']:,} tok"
+              f"  (non-en {stats_['not_english']}, overlong {stats_['overlong']}, dupes {len(cands) - len(seen)})")
+
+    if seed_on:
+        seed = from_seed(rng)[: max(16, args.target_tokens // 200000)]
+        rows = []
+        for r in seed:
+            n = token_len(r["messages"], tok)
+            if n <= max_len:
+                r["tokens"] = n
+                rows.append(r)
+        for _ in range(max(0, args.seed_repeat - 1)):
+            rows.extend({**r} for r in rows)
+        per_source["seed"] = rows
+        report["seed"] = {"candidates": len(seed), "kept": len(rows),
+                          "tokens": sum(r["tokens"] for r in rows), "not_english": 0,
+                          "overlong": 0, "dupes": 0}
+        print(f"[*] seed: kept {len(rows)} rows")
+
+    records = []
+    for src in per_source:
+        records.extend(per_source[src])
+    if len(records) < 2:
+        raise SystemExit("[!] nothing built")
     rng.shuffle(records)
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    with args.out.open("w", encoding="utf-8") as fh:
-        for row in records:
-            fh.write(json.dumps(row, ensure_ascii=False) + "\n")
 
-    # Deterministic held-out split so evaluation numbers are comparable
-    # across runs instead of being re-drawn every time.
+    # deterministic held-out split, stratified by source
+    val_rows = []
     n_val = max(1, int(len(records) * args.val_frac))
-    train_rows, val_rows = records[n_val:], records[:n_val]
+    by_src: dict[str, list[dict]] = {}
+    for r in records:
+        by_src.setdefault(r["source"], []).append(r)
+    for src, items in by_src.items():
+        take = max(1, int(len(items) * args.val_frac))
+        val_rows.extend(items[:take])
+    val_ids = {id(r) for r in val_rows}
+    train_rows = [r for r in records if id(r) not in val_ids]
+
+    args.out.parent.mkdir(parents=True, exist_ok=True)
     train_path = args.out.with_suffix(".train.jsonl")
     val_path = args.out.with_suffix(".val.jsonl")
-    for path, rows in ((train_path, train_rows), (val_path, val_rows)):
+    for path, rows in ((args.out, records), (train_path, train_rows), (val_path, val_rows)):
         with path.open("w", encoding="utf-8") as fh:
             for row in rows:
                 fh.write(json.dumps(row, ensure_ascii=False) + "\n")
-    print(f"    split    : {len(train_rows)} train -> {train_path.name}, {len(val_rows)} val -> {val_path.name}")
 
-    lens = [r["tokens"] for r in records]
-    by_src = Counter(r["source"] for r in records)
-    tok_share = Counter()
+    total_tok = sum(r["tokens"] for r in records) or 1
+    by_src_rows = Counter(r["source"] for r in records)
+    by_src_tok = Counter()
     for r in records:
-        tok_share[r["source"]] += r["tokens"]
-    total_tok = sum(tok_share.values()) or 1
-    print(f"\n[+] wrote {len(records)} rows -> {args.out}  (dup {dropped}, overlong {overlong})")
-    print(f"    mix      : {dict(by_src)}")
-    print(f"    tok share: " + ", ".join(f"{k} {100 * v / total_tok:.0f}%" for k, v in tok_share.most_common()))
-    print(f"    tokens   : med {int(stats.median(lens))} / max {max(lens)} / total {sum(lens)}")
-    print(f"    domains  : {dict(Counter(r['domain'] for r in records).most_common(8))}")
+        by_src_tok[r["source"]] += r["tokens"]
+    lens = [r["tokens"] for r in records]
+
+    print(f"\n[+] wrote {len(records)} rows -> {args.out}")
+    print(f"    split : {len(train_rows)} train / {len(val_rows)} val")
+    print(f"    tokens: med {int(stats.median(lens))} / max {max(lens)} / total {sum(lens):,}")
+    print(f"    rows  : {dict(by_src_rows)}")
+    print("    share : " + ", ".join(f"{k} {100 * v / total_tok:.0f}%" for k, v in by_src_tok.most_common()))
+    print(f"    domains: {dict(Counter(r['domain'] for r in records).most_common(10))}")
+
+    summary = {
+        "profile": args.profile,
+        "target_tokens": args.target_tokens,
+        "max_tokens": max_len,
+        "rows": len(records),
+        "tokens": sum(lens),
+        "train_rows": len(train_rows),
+        "val_rows": len(val_rows),
+        "median_tokens": int(stats.median(lens)),
+        "max_row_tokens": max(lens),
+        "per_source": report,
+        "token_share": {k: round(100 * v / total_tok, 1) for k, v in by_src_tok.items()},
+        "domains": dict(Counter(r["domain"] for r in records).most_common(20)),
+    }
+    (args.out.parent / (args.out.stem + ".report.json")).write_text(json.dumps(summary, indent=2))
+    print(f"    report: {args.out.parent / (args.out.stem + '.report.json')}")
     return 0
 
 
