@@ -27,6 +27,28 @@ import canon
 BASE = Path("model")
 _CALL_LINE = re.compile(r"^\s*([A-Za-z_][\w.]*)\((\{.*\})\)\s*$", re.M)
 
+_MARKERS = [(m.strip()) for m in canon.M.values()]
+
+
+def _stop(text: str) -> str:
+    """Cut generation at the next section marker, like a stop sequence would.
+
+    A 50M adapter does not reliably emit `</s>`, so greedy decoding keeps
+    going and opens a second `### Response:` block. Deployment stops on those
+    markers; without this the probes score an artefact of the sampler instead
+    of the model's answer.
+    """
+    for marker in _MARKERS:
+        if text.startswith(marker):
+            text = text[len(marker):]
+            break
+    for marker in _MARKERS:
+        i = text.find(marker, 1)
+        if i > 0:
+            text = text[:i]
+    return text.strip()
+
+
 PROBES = [
     ("no-tool", canon.M["user"] + "What is a language model?\n" + canon.M["response"]),
     (
@@ -171,7 +193,7 @@ def main() -> int:
             kw.update(temperature=0.5, top_k=25, top_p=0.9)
         with torch.no_grad():
             out = model.generate(ids, **kw)
-        return tok.decode(out[0][ids.shape[1]:], skip_special_tokens=True).strip()
+        return _stop(tok.decode(out[0][ids.shape[1]:], skip_special_tokens=True))
 
     print(f"\n[samples] {args.samples}x per probe, up to {args.max_new_tokens} new tokens")
     checks = {}

@@ -1,0 +1,574 @@
+[{"stream_name":"stdout","time":0.657923179,"data":"\n"}
+,{"stream_name":"stdout","time":0.657970447,"data":"==============================================================================\n"}
+,{"stream_name":"stdout","time":0.657989294,"data":"== code\n"}
+,{"stream_name":"stdout","time":0.657993397,"data":"==============================================================================\n"}
+,{"stream_name":"stdout","time":0.657997224,"data":"\n"}
+,{"stream_name":"stdout","time":0.658000672,"data":"$ git clone --depth 1 https://github.com/Exo-del/supra-50m-lora.git /kaggle/working/repo\n"}
+,{"stream_name":"stderr","time":0.686119953,"data":"Cloning into '/kaggle/working/repo'...\n"}
+,{"stream_name":"stdout","time":2.081270579,"data":"  -\u003e rc=0 in 1.4s\n"}
+,{"stream_name":"stdout","time":2.0884773660000002,"data":"2c2a77f fix: glaive functioncall parser, gsm8k marker handling, resume path, think-code split\n"}
+,{"stream_name":"stdout","time":2.088496727,"data":"\n"}
+,{"stream_name":"stdout","time":2.088500821,"data":"\n"}
+,{"stream_name":"stdout","time":2.088504555,"data":"==============================================================================\n"}
+,{"stream_name":"stdout","time":2.088509095,"data":"== deps\n"}
+,{"stream_name":"stdout","time":2.088512804,"data":"==============================================================================\n"}
+,{"stream_name":"stdout","time":2.088516675,"data":"\n"}
+,{"stream_name":"stdout","time":2.088520325,"data":"$ pip install -q -U peft datasets accelerate\n"}
+,{"stream_name":"stderr","time":12.280888369,"data":"ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.\n"}
+,{"stream_name":"stderr","time":12.280918097,"data":"bigframes 2.48.0 requires google-cloud-bigquery-storage\u003c3.0.0,\u003e=2.30.0, which is not installed.\n"}
+,{"stream_name":"stderr","time":12.280928837,"data":"gradio 6.26.0 requires pillow\u003c13.0,\u003e=8.0, but you have pillow 13.0.0 which is incompatible.\n"}
+,{"stream_name":"stdout","time":12.494717818,"data":"  -\u003e rc=0 in 10.4s\n"}
+,{"stream_name":"stdout","time":12.494753991,"data":"\n"}
+,{"stream_name":"stdout","time":12.494758736,"data":"$ pip uninstall -y -q torchao\n"}
+,{"stream_name":"stdout","time":13.235284955,"data":"  -\u003e rc=0 in 0.7s\n"}
+,{"stream_name":"stdout","time":19.452085415,"data":"torch 2.11.0+cu128 | cuda True\n"}
+,{"stream_name":"stdout","time":19.763525383,"data":"gpu Tesla T4 | 15.6 GB | cc (7, 5) | bf16 True\n"}
+,{"stream_name":"stdout","time":19.763554533,"data":"\n"}
+,{"stream_name":"stdout","time":19.76355902,"data":"==============================================================================\n"}
+,{"stream_name":"stdout","time":19.763568437,"data":"== base weights\n"}
+,{"stream_name":"stdout","time":19.763571849,"data":"==============================================================================\n"}
+,{"stream_name":"stderr","time":20.661897146,"data":"\rFetching 6 files:   0%|          | 0/6 [00:00\u003c?, ?it/s]Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.\n"}
+,{"stream_name":"stderr","time":22.510662259,"data":"\rFetching 6 files:  33%|███▎      | 2/6 [00:00\u003c00:00, 14.99it/s]\rFetching 6 files:  83%|████████▎ | 5/6 [00:00\u003c00:00, 18.97it/s]\rFetching 6 files: 100%|██████████| 6/6 [00:01\u003c00:00,  3.17it/s]\n"}
+,{"stream_name":"stdout","time":22.510981648,"data":"['.cache', 'config.json', 'generation_config.json', 'model.safetensors', 'samples.txt', 'tokenizer.json', 'tokenizer_config.json']\n"}
+,{"stream_name":"stdout","time":22.511006557,"data":"\n"}
+,{"stream_name":"stdout","time":22.511011011,"data":"==============================================================================\n"}
+,{"stream_name":"stdout","time":22.511017064,"data":"== data: english agentic + reasoning mix\n"}
+,{"stream_name":"stdout","time":22.511039933,"data":"==============================================================================\n"}
+,{"stream_name":"stdout","time":22.511044491,"data":"\n"}
+,{"stream_name":"stdout","time":22.511048592,"data":"$ python prepare_data.py --profile kaggle --target-tokens 6000000 --slice-turns 6 --cap-per-source 20000 --val-frac 0.05 --out data/mix_v4.jsonl\n"}
+,{"stream_name":"stdout","time":44.725369326,"data":"[*] profile=kaggle max_tokens=1024 target=6,000,000 tokens\n"}
+,{"stream_name":"stdout","time":44.725440039,"data":"[*] sources: ['agent-deepseek', 'agent-glaive', 'math-gsm8k', 'math-instruct', 'think-code', 'general'] + seed\n"}
+,{"stream_name":"stdout","time":44.725446489,"data":"[*] agent-deepseek: budget 1,560,000 tokens ...\n"}
+,{"stream_name":"stderr","time":46.074955014,"data":"Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.\n"}
+,{"stream_name":"stderr","time":46.625285294,"data":"Ignoring part of dataset_info from the dataset card: The `splits` field in YAML is malformed or missing the name/num_examples/num_bytes fields\n"}
+,{"stream_name":"stderr","time":48.53986253,"data":"\rGenerating train split:   0%|          | 0/2510 [00:00\u003c?, ? examples/s]\rGenerating train split: 100%|██████████| 2510/2510 [00:00\u003c00:00, 23000.82 examples/s]\rGenerating train split: 100%|██████████| 2510/2510 [00:00\u003c00:00, 22294.58 examples/s]\n"}
+,{"stream_name":"stdout","time":49.122876079,"data":"    kept 173 rows / 58,099 tok  (non-en 0, overlong 0, dupes 0)\n"}
+,{"stream_name":"stdout","time":49.122919474,"data":"[*] agent-glaive: budget 1,080,000 tokens ...\n"}
+,{"stream_name":"stderr","time":55.18792724,"data":"\rGenerating train split:   0%|          | 0/112960 [00:00\u003c?, ? examples/s]\rGenerating train split: 100%|██████████| 112960/112960 [00:03\u003c00:00, 34312.55 examples/s]\rGenerating train split: 100%|██████████| 112960/112960 [00:03\u003c00:00, 34045.41 examples/s]\n"}
+,{"stream_name":"stdout","time":60.79353676,"data":"    kept 2614 rows / 1,080,072 tok  (non-en 0, overlong 0, dupes 2939)\n"}
+,{"stream_name":"stdout","time":60.793573873,"data":"[*] math-gsm8k: budget 780,000 tokens ...\n"}
+,{"stream_name":"stderr","time":61.784144105,"data":"\rGenerating train split:   0%|          | 0/7473 [00:00\u003c?, ? examples/s]\rGenerating train split: 100%|██████████| 7473/7473 [00:00\u003c00:00, 339968.04 examples/s]\n"}
+,{"stream_name":"stderr","time":61.78909057,"data":"\rGenerating test split:   0%|          | 0/1319 [00:00\u003c?, ? examples/s]\rGenerating test split: 100%|██████████| 1319/1319 [00:00\u003c00:00, 291679.60 examples/s]\n"}
+,{"stream_name":"stdout","time":65.381590465,"data":"    kept 5362 rows / 780,020 tok  (non-en 0, overlong 0, dupes 0)\n"}
+,{"stream_name":"stdout","time":65.381627166,"data":"[*] math-instruct: budget 660,000 tokens ...\n"}
+,{"stream_name":"stderr","time":71.1735017,"data":"\rGenerating train split:   0%|          | 0/262039 [00:00\u003c?, ? examples/s]\rGenerating train split: 100%|██████████| 262039/262039 [00:03\u003c00:00, 85172.01 examples/s]\rGenerating train split: 100%|██████████| 262039/262039 [00:03\u003c00:00, 84104.59 examples/s]\n"}
+,{"stream_name":"stdout","time":75.742507115,"data":"    kept 2910 rows / 660,014 tok  (non-en 21, overlong 5, dupes 148)\n"}
+,{"stream_name":"stdout","time":75.742555014,"data":"[*] think-code: budget 960,000 tokens ...\n"}
+,{"stream_name":"stdout","time":110.669116421,"data":"    kept 11 rows / 7,240 tok  (non-en 0, overlong 0, dupes 0)\n"}
+,{"stream_name":"stdout","time":110.669160868,"data":"[*] general: budget 840,000 tokens ...\n"}
+,{"stream_name":"stderr","time":111.472275925,"data":"\rGenerating train split:   0%|          | 0/15011 [00:00\u003c?, ? examples/s]\rGenerating train split: 100%|██████████| 15011/15011 [00:00\u003c00:00, 261715.75 examples/s]\n"}
+,{"stream_name":"stdout","time":116.667991543,"data":"    kept 8450 rows / 691,670 tok  (non-en 17, overlong 0, dupes 14)\n"}
+,{"stream_name":"stdout","time":116.668047785,"data":"[*] seed: kept 24 rows\n"}
+,{"stream_name":"stdout","time":116.668106377,"data":"\n"}
+,{"stream_name":"stdout","time":116.66811289,"data":"[+] wrote 19544 rows -\u003e data/mix_v4.jsonl\n"}
+,{"stream_name":"stdout","time":116.668118011,"data":"    split : 18569 train / 975 val\n"}
+,{"stream_name":"stdout","time":116.668122411,"data":"    tokens: med 117 / max 1000 / total 3,278,510\n"}
+,{"stream_name":"stdout","time":116.668127542,"data":"    rows  : {'math-gsm8k': 5362, 'general': 8450, 'math-instruct': 2910, 'agent-glaive': 2614, 'agent-deepseek': 173, 'seed': 24, 'think-code': 11}\n"}
+,{"stream_name":"stdout","time":116.668132225,"data":"    share : agent-glaive 33%, math-gsm8k 24%, general 21%, math-instruct 20%, agent-deepseek 2%, think-code 0%, seed 0%\n"}
+,{"stream_name":"stdout","time":116.668137132,"data":"    domains: {'arithmetic': 5362, 'math': 2910, 'open_qa': 2741, 'tool-multi': 2608, 'general_qa': 2127, 'brainstorming': 1577, 'classification': 1307, 'creative_writing': 698, 'bank': 75, 'movie': 35}\n"}
+,{"stream_name":"stdout","time":116.668143772,"data":"    report: data/mix_v4.report.json\n"}
+,{"stream_name":"stdout","time":119.757263552,"data":"  -\u003e rc=0 in 97.2s\n"}
+,{"stream_name":"stdout","time":119.757312948,"data":"\n"}
+,{"stream_name":"stdout","time":119.757319958,"data":"==============================================================================\n"}
+,{"stream_name":"stdout","time":119.757324414,"data":"== train\n"}
+,{"stream_name":"stdout","time":119.757328528,"data":"==============================================================================\n"}
+,{"stream_name":"stdout","time":119.757382892,"data":"\n"}
+,{"stream_name":"stdout","time":119.757440616,"data":"$ python train.py --data /kaggle/working/repo/data/mix_v4.train.jsonl --val-data /kaggle/working/repo/data/mix_v4.val.jsonl --epochs 3 --batch-size 4 --grad-accum 8 --lr 0.0005 --max-seq 1024 --r 16 --alpha 32 --grad-checkpoint --save-steps 500 --ckpt-every 1 --out /kaggle/working/lora_out_v4\n"}
+,{"stream_name":"stdout","time":128.397921922,"data":"[*] Using local weights: /kaggle/working/repo/model\n"}
+,{"stream_name":"stdout","time":128.397948834,"data":"[*] device: cuda (float16)\n"}
+,{"stream_name":"stderr","time":128.46397501,"data":"\rLoading weights:   0%|          | 0/110 [00:00\u003c?, ?it/s]\rLoading weights: 100%|██████████| 110/110 [00:00\u003c00:00, 1673.22it/s]\n"}
+,{"stream_name":"stdout","time":1099.583247487,"data":"[*] held-out val from mix_v4.val.jsonl (975 rows)\n"}
+,{"stream_name":"stdout","time":1099.583311246,"data":"[*] rows: 18569 train / 975 val (dropped 0 overlong)\n"}
+,{"stream_name":"stdout","time":1099.583317264,"data":"[*] median train length: 117 tokens (max_seq 1024)\n"}
+,{"stream_name":"stdout","time":1099.583321626,"data":"[*] LoRA trainable: 1,794,048 / 53,580,288 (3.35%)\n"}
+,{"stream_name":"stdout","time":1099.583326058,"data":"[*] gradient checkpointing: on\n"}
+,{"stream_name":"stdout","time":1099.583346959,"data":"[*] probed batch size 4: fits\n"}
+,{"stream_name":"stdout","time":1099.583349695,"data":"[*] schedule: 1740 optimizer steps, 104 warmup\n"}
+,{"stream_name":"stdout","time":1099.583351984,"data":"  ep1 step 1/1740 loss 3.1237 lr 9.62e-06 1.5s/step\n"}
+,{"stream_name":"stdout","time":1099.583354306,"data":"  ep1 step 5/1740 loss 3.1701 lr 2.88e-05 1.4s/step\n"}
+,{"stream_name":"stdout","time":1099.583356624,"data":"  ep1 step 10/1740 loss 3.0524 lr 5.29e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583358888,"data":"  ep1 step 15/1740 loss 2.9344 lr 7.69e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583361141,"data":"  ep1 step 20/1740 loss 2.7518 lr 1.01e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583363384,"data":"  ep1 step 25/1740 loss 2.6707 lr 1.25e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583365698,"data":"  ep1 step 30/1740 loss 2.5594 lr 1.49e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583367956,"data":"  ep1 step 35/1740 loss 2.4479 lr 1.73e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583370183,"data":"  ep1 step 40/1740 loss 2.2583 lr 1.97e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583373276,"data":"  ep1 step 45/1740 loss 2.1878 lr 2.21e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583388524,"data":"  ep1 step 50/1740 loss 2.1490 lr 2.45e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583392616,"data":"  ep1 step 55/1740 loss 2.0829 lr 2.69e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583396478,"data":"  ep1 step 60/1740 loss 2.0657 lr 2.93e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583400776,"data":"  ep1 step 65/1740 loss 1.9831 lr 3.17e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583411426,"data":"  ep1 step 70/1740 loss 1.8719 lr 3.41e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583414861,"data":"  ep1 step 75/1740 loss 1.9459 lr 3.65e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583418494,"data":"  ep1 step 80/1740 loss 2.0227 lr 3.89e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583421751,"data":"  ep1 step 85/1740 loss 1.9141 lr 4.13e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583425141,"data":"  ep1 step 90/1740 loss 1.8925 lr 4.38e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583428445,"data":"  ep1 step 95/1740 loss 1.7941 lr 4.62e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583431829,"data":"  ep1 step 100/1740 loss 1.8998 lr 4.86e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583435103,"data":"  ep1 step 105/1740 loss 1.7790 lr 5.00e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583438457,"data":"  ep1 step 110/1740 loss 1.8846 lr 5.00e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583441697,"data":"  ep1 step 115/1740 loss 1.7968 lr 5.00e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583444952,"data":"  ep1 step 120/1740 loss 1.8126 lr 5.00e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.58344836,"data":"  ep1 step 125/1740 loss 1.7895 lr 5.00e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.58345747,"data":"  ep1 step 130/1740 loss 1.9308 lr 5.00e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583459974,"data":"  ep1 step 135/1740 loss 1.8883 lr 5.00e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583462214,"data":"  ep1 step 140/1740 loss 1.8676 lr 4.99e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583464437,"data":"  ep1 step 145/1740 loss 1.9180 lr 4.99e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583466743,"data":"  ep1 step 150/1740 loss 1.7920 lr 4.99e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583485384,"data":"  ep1 step 155/1740 loss 1.7563 lr 4.99e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583491279,"data":"  ep1 step 160/1740 loss 1.9079 lr 4.99e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583495408,"data":"  ep1 step 165/1740 loss 1.7678 lr 4.98e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583499401,"data":"  ep1 step 170/1740 loss 1.8520 lr 4.98e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583503189,"data":"  ep1 step 175/1740 loss 1.8825 lr 4.98e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583506614,"data":"  ep1 step 180/1740 loss 1.7061 lr 4.97e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583509911,"data":"  ep1 step 185/1740 loss 1.8480 lr 4.97e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583513181,"data":"  ep1 step 190/1740 loss 1.8421 lr 4.97e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.58351644,"data":"  ep1 step 195/1740 loss 1.7192 lr 4.96e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583519774,"data":"  ep1 step 200/1740 loss 1.7965 lr 4.96e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583523078,"data":"  ep1 step 205/1740 loss 1.8615 lr 4.95e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583526318,"data":"  ep1 step 210/1740 loss 1.8198 lr 4.95e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583529573,"data":"  ep1 step 215/1740 loss 1.8254 lr 4.94e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583532793,"data":"  ep1 step 220/1740 loss 1.8040 lr 4.94e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583536049,"data":"  ep1 step 225/1740 loss 1.8408 lr 4.93e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583539299,"data":"  ep1 step 230/1740 loss 1.8073 lr 4.93e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583542577,"data":"  ep1 step 235/1740 loss 1.8633 lr 4.92e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583545903,"data":"  ep1 step 240/1740 loss 1.8552 lr 4.92e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.58354917,"data":"  ep1 step 245/1740 loss 1.7895 lr 4.91e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583552441,"data":"  ep1 step 250/1740 loss 1.7338 lr 4.90e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583555807,"data":"  ep1 step 255/1740 loss 1.8019 lr 4.90e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583563637,"data":"  ep1 step 260/1740 loss 1.7879 lr 4.89e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.58356685,"data":"  ep1 step 265/1740 loss 1.8416 lr 4.88e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583581649,"data":"  ep1 step 270/1740 loss 1.7370 lr 4.87e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583585921,"data":"  ep1 step 275/1740 loss 1.8141 lr 4.87e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583589999,"data":"  ep1 step 280/1740 loss 1.6728 lr 4.86e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583593991,"data":"  ep1 step 285/1740 loss 1.6934 lr 4.85e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.58359789,"data":"  ep1 step 290/1740 loss 1.6294 lr 4.84e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583601273,"data":"  ep1 step 295/1740 loss 1.6948 lr 4.83e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583604562,"data":"  ep1 step 300/1740 loss 1.7223 lr 4.83e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583607845,"data":"  ep1 step 305/1740 loss 1.6916 lr 4.82e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583611226,"data":"  ep1 step 310/1740 loss 1.7137 lr 4.81e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583614481,"data":"  ep1 step 315/1740 loss 1.7953 lr 4.80e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583621577,"data":"  ep1 step 320/1740 loss 1.7884 lr 4.79e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583624995,"data":"  ep1 step 325/1740 loss 1.6901 lr 4.78e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583628361,"data":"  ep1 step 330/1740 loss 1.7072 lr 4.77e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583631626,"data":"  ep1 step 335/1740 loss 1.7020 lr 4.76e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583634985,"data":"  ep1 step 340/1740 loss 1.6855 lr 4.75e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583638244,"data":"  ep1 step 345/1740 loss 1.7590 lr 4.74e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583641987,"data":"  ep1 step 350/1740 loss 1.7658 lr 4.73e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583645265,"data":"  ep1 step 355/1740 loss 1.8606 lr 4.72e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583648617,"data":"  ep1 step 360/1740 loss 1.8313 lr 4.70e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583653656,"data":"  ep1 step 365/1740 loss 1.6960 lr 4.69e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583660501,"data":"  ep1 step 370/1740 loss 1.7570 lr 4.68e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583663327,"data":"  ep1 step 375/1740 loss 1.8076 lr 4.67e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583678122,"data":"  ep1 step 380/1740 loss 1.7052 lr 4.66e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583682423,"data":"  ep1 step 385/1740 loss 1.7236 lr 4.64e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583686479,"data":"  ep1 step 390/1740 loss 1.7629 lr 4.63e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583690526,"data":"  ep1 step 395/1740 loss 1.6702 lr 4.62e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583694504,"data":"  ep1 step 400/1740 loss 1.7046 lr 4.61e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583697907,"data":"  ep1 step 405/1740 loss 1.6566 lr 4.59e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583701263,"data":"  ep1 step 410/1740 loss 1.5312 lr 4.58e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583704683,"data":"  ep1 step 415/1740 loss 1.7810 lr 4.57e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583707944,"data":"  ep1 step 420/1740 loss 1.6901 lr 4.55e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583711329,"data":"  ep1 step 425/1740 loss 1.7351 lr 4.54e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583714605,"data":"  ep1 step 430/1740 loss 1.6503 lr 4.53e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583717972,"data":"  ep1 step 435/1740 loss 1.6703 lr 4.51e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583721286,"data":"  ep1 step 440/1740 loss 1.7322 lr 4.50e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.58372466,"data":"  ep1 step 445/1740 loss 1.7843 lr 4.48e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583727929,"data":"  ep1 step 450/1740 loss 1.6358 lr 4.47e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583731239,"data":"  ep1 step 455/1740 loss 1.7564 lr 4.45e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583734513,"data":"  ep1 step 460/1740 loss 1.6146 lr 4.44e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583737767,"data":"  ep1 step 465/1740 loss 1.5820 lr 4.42e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583741022,"data":"  ep1 step 470/1740 loss 1.8442 lr 4.41e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583744308,"data":"  ep1 step 475/1740 loss 1.8451 lr 4.39e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583747681,"data":"  ep1 step 480/1740 loss 1.7069 lr 4.38e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583759981,"data":"  ep1 step 485/1740 loss 1.6855 lr 4.36e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583774519,"data":"  ep1 step 490/1740 loss 1.7224 lr 4.34e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583778435,"data":"  ep1 step 495/1740 loss 1.7274 lr 4.33e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.58378254,"data":"[+] snapshot -\u003e /kaggle/working/lora_out_v4/step-00500\n"}
+,{"stream_name":"stdout","time":1099.583787362,"data":"  ep1 step 500/1740 loss 1.6581 lr 4.31e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583790654,"data":"  ep1 step 505/1740 loss 1.7017 lr 4.29e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583793895,"data":"  ep1 step 510/1740 loss 1.6636 lr 4.28e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583797167,"data":"  ep1 step 515/1740 loss 1.7223 lr 4.26e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583800428,"data":"  ep1 step 520/1740 loss 1.6529 lr 4.24e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583803794,"data":"  ep1 step 525/1740 loss 1.7012 lr 4.23e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.58380709,"data":"  ep1 step 530/1740 loss 1.7166 lr 4.21e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.58381095,"data":"  ep1 step 535/1740 loss 1.6756 lr 4.19e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583814348,"data":"  ep1 step 540/1740 loss 1.6968 lr 4.17e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583817597,"data":"  ep1 step 545/1740 loss 1.6161 lr 4.16e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583820812,"data":"  ep1 step 550/1740 loss 1.7835 lr 4.14e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583824667,"data":"  ep1 step 555/1740 loss 1.7788 lr 4.12e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583847566,"data":"  ep1 step 560/1740 loss 1.7110 lr 4.10e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583853299,"data":"  ep1 step 565/1740 loss 1.6524 lr 4.08e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583856639,"data":"  ep1 step 570/1740 loss 1.6738 lr 4.06e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583859939,"data":"  ep1 step 575/1740 loss 1.6690 lr 4.05e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.58386324,"data":"  ep1 step 580/1740 loss 1.5827 lr 4.03e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583866519,"data":"[=] epoch 1 | val loss 1.7662\n"}
+,{"stream_name":"stdout","time":1099.583869758,"data":"[+] checkpoint -\u003e /kaggle/working/lora_out_v4/epoch1\n"}
+,{"stream_name":"stdout","time":1099.583873174,"data":"  ep2 step 585/1740 loss 1.6432 lr 4.01e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583876417,"data":"  ep2 step 590/1740 loss 1.6604 lr 3.99e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583879727,"data":"  ep2 step 595/1740 loss 1.6391 lr 3.97e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.58388305,"data":"  ep2 step 600/1740 loss 1.5495 lr 3.95e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583886324,"data":"  ep2 step 605/1740 loss 1.5647 lr 3.93e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583889728,"data":"  ep2 step 610/1740 loss 1.6590 lr 3.91e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583892997,"data":"  ep2 step 615/1740 loss 1.5434 lr 3.89e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.58389633,"data":"  ep2 step 620/1740 loss 1.5931 lr 3.87e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583901554,"data":"  ep2 step 625/1740 loss 1.6145 lr 3.85e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583904974,"data":"  ep2 step 630/1740 loss 1.4349 lr 3.83e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583926237,"data":"  ep2 step 635/1740 loss 1.5705 lr 3.81e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583930665,"data":"  ep2 step 640/1740 loss 1.5545 lr 3.79e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583934827,"data":"  ep2 step 645/1740 loss 1.5447 lr 3.77e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583938692,"data":"  ep2 step 650/1740 loss 1.6310 lr 3.75e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583942142,"data":"  ep2 step 655/1740 loss 1.5794 lr 3.73e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583945411,"data":"  ep2 step 660/1740 loss 1.6152 lr 3.71e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583948805,"data":"  ep2 step 665/1740 loss 1.6364 lr 3.68e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583952065,"data":"  ep2 step 670/1740 loss 1.5718 lr 3.66e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583955454,"data":"  ep2 step 675/1740 loss 1.6306 lr 3.64e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.58395869,"data":"  ep2 step 680/1740 loss 1.5664 lr 3.62e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583962031,"data":"  ep2 step 685/1740 loss 1.5247 lr 3.60e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583965295,"data":"  ep2 step 690/1740 loss 1.6468 lr 3.58e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583968696,"data":"  ep2 step 695/1740 loss 1.4450 lr 3.56e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.58397204,"data":"  ep2 step 700/1740 loss 1.5772 lr 3.53e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583975472,"data":"  ep2 step 705/1740 loss 1.4990 lr 3.51e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":1099.583978727,"data":"  ep2 step 710/1740 loss 1.5861 lr 3.49e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226066184,"data":"  ep2 step 715/1740 loss 1.6725 lr 3.47e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226126392,"data":"  ep2 step 720/1740 loss 1.6272 lr 3.45e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.22613624,"data":"  ep2 step 725/1740 loss 1.6666 lr 3.42e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.22614068,"data":"  ep2 step 730/1740 loss 1.4980 lr 3.40e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.22614497,"data":"  ep2 step 735/1740 loss 1.5402 lr 3.38e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226149136,"data":"  ep2 step 740/1740 loss 1.7378 lr 3.36e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.22615401,"data":"  ep2 step 745/1740 loss 1.6702 lr 3.33e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226158626,"data":"  ep2 step 750/1740 loss 1.5930 lr 3.31e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226163035,"data":"  ep2 step 755/1740 loss 1.5662 lr 3.29e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226167628,"data":"  ep2 step 760/1740 loss 1.5795 lr 3.27e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226171756,"data":"  ep2 step 765/1740 loss 1.6005 lr 3.24e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226175889,"data":"  ep2 step 770/1740 loss 1.5242 lr 3.22e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226179995,"data":"  ep2 step 775/1740 loss 1.6522 lr 3.20e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226184186,"data":"  ep2 step 780/1740 loss 1.5926 lr 3.17e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226188643,"data":"  ep2 step 785/1740 loss 1.5691 lr 3.15e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226194445,"data":"  ep2 step 790/1740 loss 1.5552 lr 3.13e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226199171,"data":"  ep2 step 795/1740 loss 1.6466 lr 3.10e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226205072,"data":"  ep2 step 800/1740 loss 1.6268 lr 3.08e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226223258,"data":"  ep2 step 805/1740 loss 1.6572 lr 3.06e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226227075,"data":"  ep2 step 810/1740 loss 1.6009 lr 3.03e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226230448,"data":"  ep2 step 815/1740 loss 1.5077 lr 3.01e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226233827,"data":"  ep2 step 820/1740 loss 1.6602 lr 2.99e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226237166,"data":"  ep2 step 825/1740 loss 1.4672 lr 2.96e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.22624045,"data":"  ep2 step 830/1740 loss 1.7216 lr 2.94e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226243818,"data":"  ep2 step 835/1740 loss 1.6194 lr 2.92e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226247089,"data":"  ep2 step 840/1740 loss 1.5161 lr 2.89e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226250485,"data":"  ep2 step 845/1740 loss 1.6155 lr 2.87e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226253723,"data":"  ep2 step 850/1740 loss 1.6902 lr 2.84e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226257106,"data":"  ep2 step 855/1740 loss 1.5129 lr 2.82e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226260355,"data":"  ep2 step 860/1740 loss 1.6284 lr 2.80e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226263856,"data":"  ep2 step 865/1740 loss 1.5118 lr 2.77e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226267274,"data":"  ep2 step 870/1740 loss 1.5716 lr 2.75e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226276886,"data":"  ep2 step 875/1740 loss 1.5840 lr 2.73e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226279363,"data":"  ep2 step 880/1740 loss 1.5893 lr 2.70e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226281656,"data":"  ep2 step 885/1740 loss 1.5438 lr 2.68e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226283848,"data":"  ep2 step 890/1740 loss 1.6371 lr 2.65e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226286139,"data":"  ep2 step 895/1740 loss 1.4924 lr 2.63e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226288686,"data":"  ep2 step 900/1740 loss 1.6499 lr 2.61e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226305281,"data":"  ep2 step 905/1740 loss 1.5743 lr 2.58e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226309394,"data":"  ep2 step 910/1740 loss 1.4920 lr 2.56e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226313351,"data":"  ep2 step 915/1740 loss 1.5832 lr 2.53e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226317391,"data":"  ep2 step 920/1740 loss 1.5547 lr 2.51e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226321096,"data":"  ep2 step 925/1740 loss 1.3804 lr 2.49e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226324475,"data":"  ep2 step 930/1740 loss 1.4952 lr 2.46e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226327768,"data":"  ep2 step 935/1740 loss 1.5038 lr 2.44e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226331248,"data":"  ep2 step 940/1740 loss 1.5229 lr 2.41e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226334632,"data":"  ep2 step 945/1740 loss 1.5712 lr 2.39e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226337866,"data":"  ep2 step 950/1740 loss 1.4868 lr 2.37e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226341518,"data":"  ep2 step 955/1740 loss 1.5607 lr 2.34e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226344748,"data":"  ep2 step 960/1740 loss 1.6150 lr 2.32e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.2263481,"data":"  ep2 step 965/1740 loss 1.5752 lr 2.29e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.22635514,"data":"  ep2 step 970/1740 loss 1.5897 lr 2.27e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226358581,"data":"  ep2 step 975/1740 loss 1.5255 lr 2.25e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226361868,"data":"  ep2 step 980/1740 loss 1.6581 lr 2.22e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.22636512,"data":"  ep2 step 985/1740 loss 1.5685 lr 2.20e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226368423,"data":"  ep2 step 990/1740 loss 1.4768 lr 2.17e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226371886,"data":"  ep2 step 995/1740 loss 1.5340 lr 2.15e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.22637987,"data":"[+] snapshot -\u003e /kaggle/working/lora_out_v4/step-01000\n"}
+,{"stream_name":"stdout","time":2089.226383181,"data":"  ep2 step 1000/1740 loss 1.4995 lr 2.13e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226386226,"data":"  ep2 step 1005/1740 loss 1.4641 lr 2.10e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226405486,"data":"  ep2 step 1010/1740 loss 1.4913 lr 2.08e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226409561,"data":"  ep2 step 1015/1740 loss 1.4697 lr 2.06e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226413626,"data":"  ep2 step 1020/1740 loss 1.4363 lr 2.03e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.22641747,"data":"  ep2 step 1025/1740 loss 1.5252 lr 2.01e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226421426,"data":"  ep2 step 1030/1740 loss 1.6684 lr 1.99e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226425064,"data":"  ep2 step 1035/1740 loss 1.5882 lr 1.96e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.2264284,"data":"  ep2 step 1040/1740 loss 1.6072 lr 1.94e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226431695,"data":"  ep2 step 1045/1740 loss 1.5647 lr 1.91e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226435,"data":"  ep2 step 1050/1740 loss 1.5734 lr 1.89e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226438302,"data":"  ep2 step 1055/1740 loss 1.6314 lr 1.87e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226441569,"data":"  ep2 step 1060/1740 loss 1.4022 lr 1.85e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226444818,"data":"  ep2 step 1065/1740 loss 1.5314 lr 1.82e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226448085,"data":"  ep2 step 1070/1740 loss 1.6738 lr 1.80e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226451411,"data":"  ep2 step 1075/1740 loss 1.5673 lr 1.78e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226454775,"data":"  ep2 step 1080/1740 loss 1.5218 lr 1.75e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226458091,"data":"  ep2 step 1085/1740 loss 1.5211 lr 1.73e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.22646187,"data":"  ep2 step 1090/1740 loss 1.5312 lr 1.71e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226465155,"data":"  ep2 step 1095/1740 loss 1.5259 lr 1.68e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226468497,"data":"  ep2 step 1100/1740 loss 1.6138 lr 1.66e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226471735,"data":"  ep2 step 1105/1740 loss 1.5348 lr 1.64e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226480955,"data":"  ep2 step 1110/1740 loss 1.5085 lr 1.62e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226485978,"data":"  ep2 step 1115/1740 loss 1.5964 lr 1.59e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.22649243,"data":"  ep2 step 1120/1740 loss 1.5186 lr 1.57e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.22651079,"data":"  ep2 step 1125/1740 loss 1.6717 lr 1.55e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226515203,"data":"  ep2 step 1130/1740 loss 1.5185 lr 1.53e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226519099,"data":"  ep2 step 1135/1740 loss 1.5969 lr 1.51e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.22652287,"data":"  ep2 step 1140/1740 loss 1.6005 lr 1.48e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226526278,"data":"  ep2 step 1145/1740 loss 1.4956 lr 1.46e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226529571,"data":"  ep2 step 1150/1740 loss 1.5238 lr 1.44e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226532863,"data":"  ep2 step 1155/1740 loss 1.5308 lr 1.42e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226536177,"data":"  ep2 step 1160/1740 loss 1.6414 lr 1.40e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226539536,"data":"[=] epoch 2 | val loss 1.7205\n"}
+,{"stream_name":"stdout","time":2089.226542851,"data":"[+] checkpoint -\u003e /kaggle/working/lora_out_v4/epoch2\n"}
+,{"stream_name":"stdout","time":2089.22654629,"data":"  ep3 step 1165/1740 loss 1.5167 lr 1.38e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226549565,"data":"  ep3 step 1170/1740 loss 1.4816 lr 1.35e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226552954,"data":"  ep3 step 1175/1740 loss 1.5004 lr 1.33e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226556235,"data":"  ep3 step 1180/1740 loss 1.5495 lr 1.31e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226559598,"data":"  ep3 step 1185/1740 loss 1.4140 lr 1.29e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226562878,"data":"  ep3 step 1190/1740 loss 1.4161 lr 1.27e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.22656619,"data":"  ep3 step 1195/1740 loss 1.4284 lr 1.25e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226569483,"data":"  ep3 step 1200/1740 loss 1.4470 lr 1.23e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226572725,"data":"  ep3 step 1205/1740 loss 1.6036 lr 1.21e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.22657793,"data":"  ep3 step 1210/1740 loss 1.5736 lr 1.19e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226584396,"data":"  ep3 step 1215/1740 loss 1.4454 lr 1.17e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226587366,"data":"  ep3 step 1220/1740 loss 1.4098 lr 1.15e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226601542,"data":"  ep3 step 1225/1740 loss 1.5050 lr 1.13e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226605685,"data":"  ep3 step 1230/1740 loss 1.3836 lr 1.11e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.22660945,"data":"  ep3 step 1235/1740 loss 1.5375 lr 1.09e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226613415,"data":"  ep3 step 1240/1740 loss 1.4441 lr 1.07e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226617332,"data":"  ep3 step 1245/1740 loss 1.5154 lr 1.05e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226620661,"data":"  ep3 step 1250/1740 loss 1.4519 lr 1.03e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226624022,"data":"  ep3 step 1255/1740 loss 1.4338 lr 1.01e-04 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226627315,"data":"  ep3 step 1260/1740 loss 1.4245 lr 9.89e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226630641,"data":"  ep3 step 1265/1740 loss 1.6578 lr 9.70e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226634497,"data":"  ep3 step 1270/1740 loss 1.3599 lr 9.51e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226637806,"data":"  ep3 step 1275/1740 loss 1.4949 lr 9.32e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226644484,"data":"  ep3 step 1280/1740 loss 1.4459 lr 9.14e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226647815,"data":"  ep3 step 1285/1740 loss 1.5282 lr 8.95e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226651122,"data":"  ep3 step 1290/1740 loss 1.4393 lr 8.77e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226654387,"data":"  ep3 step 1295/1740 loss 1.4555 lr 8.59e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226657696,"data":"  ep3 step 1300/1740 loss 1.4035 lr 8.41e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226660989,"data":"  ep3 step 1305/1740 loss 1.4900 lr 8.23e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226664276,"data":"  ep3 step 1310/1740 loss 1.4690 lr 8.05e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226667512,"data":"  ep3 step 1315/1740 loss 1.3642 lr 7.87e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.22667078,"data":"  ep3 step 1320/1740 loss 1.3817 lr 7.70e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226679327,"data":"  ep3 step 1325/1740 loss 1.5026 lr 7.53e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226682645,"data":"  ep3 step 1330/1740 loss 1.4332 lr 7.36e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.22669737,"data":"  ep3 step 1335/1740 loss 1.5024 lr 7.19e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226701457,"data":"  ep3 step 1340/1740 loss 1.5544 lr 7.02e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226705167,"data":"  ep3 step 1345/1740 loss 1.3617 lr 6.85e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226708819,"data":"  ep3 step 1350/1740 loss 1.4283 lr 6.69e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226712921,"data":"  ep3 step 1355/1740 loss 1.5186 lr 6.53e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226716313,"data":"  ep3 step 1360/1740 loss 1.5295 lr 6.37e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226719609,"data":"  ep3 step 1365/1740 loss 1.5034 lr 6.21e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226722867,"data":"  ep3 step 1370/1740 loss 1.5273 lr 6.05e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226726122,"data":"  ep3 step 1375/1740 loss 1.4894 lr 5.89e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226729381,"data":"  ep3 step 1380/1740 loss 1.3166 lr 5.74e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226732634,"data":"  ep3 step 1385/1740 loss 1.4221 lr 5.59e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226735829,"data":"  ep3 step 1390/1740 loss 1.4311 lr 5.44e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226739112,"data":"  ep3 step 1395/1740 loss 1.4800 lr 5.29e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226742392,"data":"  ep3 step 1400/1740 loss 1.4406 lr 5.14e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226745682,"data":"  ep3 step 1405/1740 loss 1.3839 lr 5.00e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226748923,"data":"  ep3 step 1410/1740 loss 1.4544 lr 4.85e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226752199,"data":"  ep3 step 1415/1740 loss 1.5507 lr 4.71e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226755453,"data":"  ep3 step 1420/1740 loss 1.4535 lr 4.57e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226758696,"data":"  ep3 step 1425/1740 loss 1.4604 lr 4.44e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226762052,"data":"  ep3 step 1430/1740 loss 1.4138 lr 4.30e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226765323,"data":"  ep3 step 1435/1740 loss 1.5017 lr 4.17e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226770453,"data":"  ep3 step 1440/1740 loss 1.4198 lr 4.03e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226791631,"data":"  ep3 step 1445/1740 loss 1.4051 lr 3.91e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2089.226795564,"data":"  ep3 step 1450/1740 loss 1.4176 lr 3.78e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070516189,"data":"  ep3 step 1455/1740 loss 1.3464 lr 3.65e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070560256,"data":"  ep3 step 1460/1740 loss 1.4858 lr 3.53e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.0705798,"data":"  ep3 step 1465/1740 loss 1.4103 lr 3.41e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070585553,"data":"  ep3 step 1470/1740 loss 1.5940 lr 3.29e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070590667,"data":"  ep3 step 1475/1740 loss 1.4514 lr 3.17e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070595468,"data":"  ep3 step 1480/1740 loss 1.3549 lr 3.05e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070599625,"data":"  ep3 step 1485/1740 loss 1.4086 lr 2.94e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070603778,"data":"  ep3 step 1490/1740 loss 1.5009 lr 2.83e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070607921,"data":"  ep3 step 1495/1740 loss 1.4373 lr 2.72e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070611982,"data":"[+] snapshot -\u003e /kaggle/working/lora_out_v4/step-01500\n"}
+,{"stream_name":"stdout","time":2477.07061656,"data":"  ep3 step 1500/1740 loss 1.4976 lr 2.61e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070620809,"data":"  ep3 step 1505/1740 loss 1.4585 lr 2.50e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070624925,"data":"  ep3 step 1510/1740 loss 1.5026 lr 2.40e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070629072,"data":"  ep3 step 1515/1740 loss 1.4195 lr 2.30e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070633247,"data":"  ep3 step 1520/1740 loss 1.5405 lr 2.20e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070637468,"data":"  ep3 step 1525/1740 loss 1.4971 lr 2.10e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070646532,"data":"  ep3 step 1530/1740 loss 1.4906 lr 2.01e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070649531,"data":"  ep3 step 1535/1740 loss 1.4231 lr 1.91e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070652305,"data":"  ep3 step 1540/1740 loss 1.4305 lr 1.82e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070655058,"data":"  ep3 step 1545/1740 loss 1.4395 lr 1.73e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070657995,"data":"  ep3 step 1550/1740 loss 1.4054 lr 1.65e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070673385,"data":"  ep3 step 1555/1740 loss 1.4883 lr 1.56e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070678486,"data":"  ep3 step 1560/1740 loss 1.4341 lr 1.48e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070683203,"data":"  ep3 step 1565/1740 loss 1.5310 lr 1.40e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.0706883,"data":"  ep3 step 1570/1740 loss 1.3850 lr 1.32e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070692597,"data":"  ep3 step 1575/1740 loss 1.5097 lr 1.24e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070696837,"data":"  ep3 step 1580/1740 loss 1.5879 lr 1.17e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070700901,"data":"  ep3 step 1585/1740 loss 1.4451 lr 1.10e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070705055,"data":"  ep3 step 1590/1740 loss 1.4262 lr 1.03e-05 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070709166,"data":"  ep3 step 1595/1740 loss 1.4453 lr 9.63e-06 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070713377,"data":"  ep3 step 1600/1740 loss 1.4090 lr 8.98e-06 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070729063,"data":"  ep3 step 1605/1740 loss 1.3896 lr 8.35e-06 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070732432,"data":"  ep3 step 1610/1740 loss 1.3650 lr 7.75e-06 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070735679,"data":"  ep3 step 1615/1740 loss 1.5635 lr 7.17e-06 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.07073892,"data":"  ep3 step 1620/1740 loss 1.5450 lr 6.61e-06 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070742195,"data":"  ep3 step 1625/1740 loss 1.4793 lr 6.07e-06 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070750562,"data":"  ep3 step 1630/1740 loss 1.4600 lr 5.56e-06 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070753596,"data":"  ep3 step 1635/1740 loss 1.3698 lr 5.06e-06 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070769462,"data":"  ep3 step 1640/1740 loss 1.5470 lr 4.60e-06 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070773722,"data":"  ep3 step 1645/1740 loss 1.5131 lr 4.15e-06 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070777438,"data":"  ep3 step 1650/1740 loss 1.4947 lr 3.72e-06 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070781251,"data":"  ep3 step 1655/1740 loss 1.3802 lr 3.32e-06 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070784955,"data":"  ep3 step 1660/1740 loss 1.3859 lr 2.94e-06 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070788233,"data":"  ep3 step 1665/1740 loss 1.3408 lr 2.59e-06 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070791473,"data":"  ep3 step 1670/1740 loss 1.4225 lr 2.26e-06 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070794788,"data":"  ep3 step 1675/1740 loss 1.3901 lr 1.94e-06 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070798034,"data":"  ep3 step 1680/1740 loss 1.3907 lr 1.66e-06 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070801279,"data":"  ep3 step 1685/1740 loss 1.5147 lr 1.39e-06 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070804504,"data":"  ep3 step 1690/1740 loss 1.5224 lr 1.15e-06 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070807763,"data":"  ep3 step 1695/1740 loss 1.4407 lr 9.33e-07 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070810997,"data":"  ep3 step 1700/1740 loss 1.4770 lr 7.37e-07 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070814235,"data":"  ep3 step 1705/1740 loss 1.4830 lr 5.64e-07 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070817535,"data":"  ep3 step 1710/1740 loss 1.5490 lr 4.15e-07 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070820788,"data":"  ep3 step 1715/1740 loss 1.3596 lr 2.88e-07 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070824668,"data":"  ep3 step 1720/1740 loss 1.4135 lr 1.84e-07 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070854905,"data":"  ep3 step 1725/1740 loss 1.4791 lr 1.04e-07 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070859225,"data":"  ep3 step 1730/1740 loss 1.4338 lr 4.61e-08 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070862567,"data":"  ep3 step 1735/1740 loss 1.4703 lr 1.15e-08 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070865948,"data":"  ep3 step 1740/1740 loss 1.5861 lr 0.00e+00 1.3s/step\n"}
+,{"stream_name":"stdout","time":2477.070869237,"data":"[=] epoch 3 | val loss 1.7177\n"}
+,{"stream_name":"stdout","time":2477.070872543,"data":"[+] checkpoint -\u003e /kaggle/working/lora_out_v4/epoch3\n"}
+,{"stream_name":"stdout","time":2477.070875992,"data":"[+] Adapter saved -\u003e /kaggle/working/lora_out_v4\n"}
+,{"stream_name":"stdout","time":2477.070879449,"data":"[+] 1740 optimizer steps | 9,336,023 tokens seen | 39.0 min | 3,994 tok/s\n"}
+,{"stream_name":"stdout","time":2478.292680933,"data":"  -\u003e rc=0 in 2358.5s\n"}
+,{"stream_name":"stdout","time":2478.292731882,"data":"\n"}
+,{"stream_name":"stdout","time":2478.292750957,"data":"==============================================================================\n"}
+,{"stream_name":"stdout","time":2478.292755192,"data":"== eval\n"}
+,{"stream_name":"stdout","time":2478.292759056,"data":"==============================================================================\n"}
+,{"stream_name":"stdout","time":2478.292808136,"data":"\n"}
+,{"stream_name":"stdout","time":2478.292813825,"data":"$ python eval_run.py --adapter /kaggle/working/lora_out_v4 --data /kaggle/working/repo/data/mix_v4.jsonl --per-source 30 --samples 2 --max-new-tokens 120\n"}
+,{"stream_name":"stderr","time":2496.49019339,"data":"\rLoading weights:   0%|          | 0/110 [00:00\u003c?, ?it/s]\rLoading weights: 100%|██████████| 110/110 [00:00\u003c00:00, 1781.12it/s]\n"}
+,{"stream_name":"stdout","time":2499.189484676,"data":"\n"}
+,{"stream_name":"stdout","time":2499.18951358,"data":"[base] loss by source\n"}
+,{"stream_name":"stdout","time":2499.189518716,"data":"    agent-deepseek      2.982  (30 rows)\n"}
+,{"stream_name":"stdout","time":2499.189522903,"data":"    agent-glaive        2.885  (30 rows)\n"}
+,{"stream_name":"stdout","time":2499.189526915,"data":"    general             3.633  (30 rows)\n"}
+,{"stream_name":"stdout","time":2499.189530528,"data":"    math-gsm8k          2.983  (30 rows)\n"}
+,{"stream_name":"stdout","time":2499.189534189,"data":"    math-instruct       2.815  (30 rows)\n"}
+,{"stream_name":"stdout","time":2499.189537884,"data":"    seed                4.040  (24 rows)\n"}
+,{"stream_name":"stdout","time":2499.189541638,"data":"    think-code          2.868  (11 rows)\n"}
+,{"stream_name":"stderr","time":2499.246102119,"data":"\rLoading weights:   0%|          | 0/110 [00:00\u003c?, ?it/s]\rLoading weights: 100%|██████████| 110/110 [00:00\u003c00:00, 1963.40it/s]\n"}
+,{"stream_name":"stdout","time":2531.104264999,"data":"\n"}
+,{"stream_name":"stdout","time":2531.104327903,"data":"[lora /kaggle/working/lora_out_v4] loss by source\n"}
+,{"stream_name":"stdout","time":2531.104335279,"data":"    agent-deepseek      1.067  (30 rows)\n"}
+,{"stream_name":"stdout","time":2531.104356371,"data":"    agent-glaive        0.250  (30 rows)\n"}
+,{"stream_name":"stdout","time":2531.10436107,"data":"    general             2.314  (30 rows)\n"}
+,{"stream_name":"stdout","time":2531.104366414,"data":"    math-gsm8k          1.090  (30 rows)\n"}
+,{"stream_name":"stdout","time":2531.1043711,"data":"    math-instruct       1.330  (30 rows)\n"}
+,{"stream_name":"stdout","time":2531.104375732,"data":"    seed                2.527  (24 rows)\n"}
+,{"stream_name":"stdout","time":2531.1043893,"data":"    think-code          2.239  (11 rows)\n"}
+,{"stream_name":"stdout","time":2531.104395686,"data":"\n"}
+,{"stream_name":"stdout","time":2531.104401148,"data":"[delta] loss reduction\n"}
+,{"stream_name":"stdout","time":2531.104405758,"data":"    agent-deepseek      2.982 -\u003e  1.067   +1.914 (+64%)\n"}
+,{"stream_name":"stdout","time":2531.104410676,"data":"    agent-glaive        2.885 -\u003e  0.250   +2.635 (+91%)\n"}
+,{"stream_name":"stdout","time":2531.104415371,"data":"    general             3.633 -\u003e  2.314   +1.319 (+36%)\n"}
+,{"stream_name":"stdout","time":2531.104420182,"data":"    math-gsm8k          2.983 -\u003e  1.090   +1.894 (+63%)\n"}
+,{"stream_name":"stdout","time":2531.104425559,"data":"    math-instruct       2.815 -\u003e  1.330   +1.485 (+53%)\n"}
+,{"stream_name":"stdout","time":2531.10443284,"data":"    seed                4.040 -\u003e  2.527   +1.513 (+37%)\n"}
+,{"stream_name":"stdout","time":2531.104446686,"data":"    think-code          2.868 -\u003e  2.239   +0.629 (+22%)\n"}
+,{"stream_name":"stdout","time":2531.104451015,"data":"\n"}
+,{"stream_name":"stdout","time":2531.10445463,"data":"[samples] 2x per probe, up to 120 new tokens\n"}
+,{"stream_name":"stdout","time":2531.104458818,"data":"\n"}
+,{"stream_name":"stdout","time":2531.104463268,"data":"======================================================================\n"}
+,{"stream_name":"stdout","time":2531.104468284,"data":"no-tool\n"}
+,{"stream_name":"stdout","time":2531.104472464,"data":"  [1] PASS (tool_call=False)\n"}
+,{"stream_name":"stdout","time":2531.104476938,"data":"      A language model is an interface that allows the user to interact with and manipulate data in a computer system.  The most common languages include Ja\n"}
+,{"stream_name":"stdout","time":2531.1044815,"data":"      �}\n"}
+,{"stream_name":"stdout","time":2531.10448564,"data":"      \u0015)\n"}
+,{"stream_name":"stdout","time":2531.104489451,"data":"      \u0005(1)\n"}
+,{"stream_name":"stdout","time":2531.104493244,"data":"      \u0012(2)\n"}
+,{"stream_name":"stdout","time":2531.104496812,"data":"      \u001a(3)\n"}
+,{"stream_name":"stdout","time":2531.104501273,"data":"  [2] PASS (tool_call=False)\n"}
+,{"stream_name":"stdout","time":2531.104505318,"data":"      A language model (also called an API) is a software or hardware interface that provides access to data and other information.  The language model is t\n"}
+,{"stream_name":"stdout","time":2531.104509625,"data":"      \u0006NET is an application programming interface for computers. It's designed primarily for use by web browsers and mobile devices. …\n"}
+,{"stream_name":"stdout","time":2531.104513825,"data":"      \u001bNetwork is a network management system for machines. It allows users to connect to networks using the Internet. …\n"}
+,{"stream_name":"stdout","time":2531.1045178,"data":"      \u0002Internet is a set of protocols that allow people to communicate with each other over the internet.\n"}
+,{"stream_name":"stdout","time":2531.104521772,"data":"  -\u003e no-tool: 2/2\n"}
+,{"stream_name":"stdout","time":2531.104525529,"data":"\n"}
+,{"stream_name":"stdout","time":2531.104529626,"data":"======================================================================\n"}
+,{"stream_name":"stdout","time":2531.104533824,"data":"tool-call\n"}
+,{"stream_name":"stdout","time":2531.104537434,"data":"  [1] fail (tool_call=True parsed=False)\n"}
+,{"stream_name":"stdout","time":2531.1045412,"data":"      I'd be happy to help you get that much more!\n"}
+,{"stream_name":"stdout","time":2531.104544921,"data":"      �### Response:\n"}
+,{"stream_name":"stdout","time":2531.104548644,"data":"      ### Tool call:\n"}
+,{"stream_name":"stdout","time":2531.104552322,"data":"      get_client_name_by_s1 = yes\n"}
+,{"stream_name":"stdout","time":2531.104555962,"data":"      print(int(get_clients))\n"}
+,{"stream_name":"stdout","time":2531.1045597,"data":"      �### Response:\n"}
+,{"stream_name":"stdout","time":2531.104563393,"data":"  [2] fail (tool_call=False parsed=False)\n"}
+,{"stream_name":"stdout","time":2531.104568788,"data":"      Great! I can help you keep your shipping address accurate and up-to-date.\n"}
+,{"stream_name":"stdout","time":2531.104572756,"data":"      \u000f### Response:\n"}
+,{"stream_name":"stdout","time":2531.10457651,"data":"      Thanks for being the customer!\n"}
+,{"stream_name":"stdout","time":2531.104580242,"data":"      �### Response:\n"}
+,{"stream_name":"stdout","time":2531.104583883,"data":"      Thank you for your feedback.\n"}
+,{"stream_name":"stdout","time":2531.104587668,"data":"      \u000e### Response:\n"}
+,{"stream_name":"stdout","time":2531.104595564,"data":"  -\u003e tool-call: 0/2\n"}
+,{"stream_name":"stdout","time":2531.104599195,"data":"\n"}
+,{"stream_name":"stdout","time":2531.104602719,"data":"======================================================================\n"}
+,{"stream_name":"stdout","time":2531.104606544,"data":"math\n"}
+,{"stream_name":"stdout","time":2531.104610071,"data":"  [1] fail (thinking=False response=False)\n"}
+,{"stream_name":"stdout","time":2531.104613925,"data":"      There are 6 x $7 = $14 in the bills.\n"}
+,{"stream_name":"stdout","time":2531.10461778,"data":"      The price of a 15-pound piece of paper is $15/pen * 15 cents per pen = $48.\n"}
+,{"stream_name":"stdout","time":2531.10462186,"data":"      So, 12 pens costs 12 / 14 = $2.50.\n"}
+,{"stream_name":"stdout","time":2531.104625906,"data":"      �5}\n"}
+,{"stream_name":"stdout","time":2531.104630568,"data":"      �4}\n"}
+,{"stream_name":"stdout","time":2531.104634488,"data":"      \u00011}\n"}
+,{"stream_name":"stdout","time":2531.104638226,"data":"  [2] fail (thinking=False response=False)\n"}
+,{"stream_name":"stdout","time":2531.10464199,"data":"      12 pens are sold at $7 per pen x 1/3 = $2.\n"}
+,{"stream_name":"stdout","time":2531.104645867,"data":"      The total cost of the pens is $13.\n"}
+,{"stream_name":"stdout","time":2531.104649578,"data":"      So, 12 pens cost 12*13=$36\n"}
+,{"stream_name":"stdout","time":2531.104653323,"data":"      \u001bAnswer\n"}
+,{"stream_name":"stdout","time":2531.104657424,"data":"      \u0013Ensiedem Sachsen\n"}
+,{"stream_name":"stdout","time":2531.104662203,"data":"      �4209.0376\n"}
+,{"stream_name":"stdout","time":2531.104665997,"data":"  -\u003e math: 0/2\n"}
+,{"stream_name":"stdout","time":2531.104669641,"data":"\n"}
+,{"stream_name":"stdout","time":2531.104673208,"data":"======================================================================\n"}
+,{"stream_name":"stdout","time":2531.104676981,"data":"code\n"}
+,{"stream_name":"stdout","time":2531.104680788,"data":"  [1] fail (thinking=False response=False)\n"}
+,{"stream_name":"stdout","time":2531.104685586,"data":"      import math\n"}
+,{"stream_name":"stdout","time":2531.104689406,"data":"      \n"}
+,{"stream_name":"stdout","time":2531.10469334,"data":"      def reverse_sqrt():\n"}
+,{"stream_name":"stdout","time":2531.104697653,"data":"         return sum('A')\n"}
+,{"stream_name":"stdout","time":2531.104702279,"data":"      \n"}
+,{"stream_name":"stdout","time":2531.104706131,"data":"      print(false)\n"}
+,{"stream_name":"stdout","time":2531.104709736,"data":"  [2] fail (thinking=False response=False)\n"}
+,{"stream_name":"stdout","time":2531.104713484,"data":"      import math\n"}
+,{"stream_name":"stdout","time":2531.104717624,"data":"      \n"}
+,{"stream_name":"stdout","time":2531.104722088,"data":"      def reverse(n):\n"}
+,{"stream_name":"stdout","time":2531.104725984,"data":"         return n * n / 1\n"}
+,{"stream_name":"stdout","time":2531.104730427,"data":"      print('false')\n"}
+,{"stream_name":"stdout","time":2531.104734939,"data":"      \n"}
+,{"stream_name":"stdout","time":2531.104738432,"data":"  -\u003e code: 0/2\n"}
+,{"stream_name":"stdout","time":2531.104742474,"data":"\n"}
+,{"stream_name":"stdout","time":2531.104747241,"data":"[summary] {'no-tool': '2/2', 'tool-call': '0/2', 'math': '0/2', 'code': '0/2'}\n"}
+,{"stream_name":"stdout","time":2532.359387472,"data":"  -\u003e rc=0 in 54.1s\n"}
+,{"stream_name":"stdout","time":2532.35941935,"data":"\n"}
+,{"stream_name":"stdout","time":2532.359424697,"data":"==============================================================================\n"}
+,{"stream_name":"stdout","time":2532.359441604,"data":"== package\n"}
+,{"stream_name":"stdout","time":2532.359445954,"data":"==============================================================================\n"}
+,{"stream_name":"stdout","time":2534.282811759,"data":"adapter zip: /kaggle/working/supra50m-v4-lora.zip (40.4 MB)\n"}
+,{"stream_name":"stdout","time":2534.283060002,"data":"  lora_out_v4                              0.0 MB\n"}
+,{"stream_name":"stdout","time":2534.283072908,"data":"  repo                                     0.0 MB\n"}
+,{"stream_name":"stdout","time":2534.283083848,"data":"  supra50m-v4-lora.zip                     40.4 MB\n"}
+,{"stream_name":"stdout","time":2534.283087527,"data":"\n"}
+,{"stream_name":"stdout","time":2534.283090818,"data":"DONE_V4\n"}
+,{"stream_name":"stderr","time":2536.746659676,"data":"/usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":2536.746684817,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":2536.950408305,"data":"/usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":2536.950429135,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":2537.680801271,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":2538.54361973,"data":"[NbConvertApp] Writing 293997 bytes to __results__.html\n"}
+]

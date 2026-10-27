@@ -78,13 +78,13 @@ DS_GENERAL = "databricks/databricks-dolly-15k"
 
 # Token share per source. Renormalised over whichever sources are enabled.
 WEIGHTS = {
-    "agent-deepseek": 0.27,
-    "agent-glaive": 0.18,
-    "math-gsm8k": 0.13,
-    "math-instruct": 0.11,
-    "code-magicoder": 0.14,
-    "general": 0.15,
-    "seed": 0.02,
+    "agent-deepseek": 0.24,
+    "agent-glaive": 0.14,
+    "math-gsm8k": 0.14,
+    "math-instruct": 0.12,
+    "code-magicoder": 0.16,
+    "general": 0.16,
+    "seed": 0.04,
 }
 
 # Clip budgets in chars per profile.
@@ -166,21 +166,31 @@ def _row(msgs: list[dict], source: str, domain: str) -> dict:
 
 
 # --------------------------------------------------------------- sources
-def from_agent_deepseek(cap: int, rng: random.Random, slice_k: int = 4) -> list[dict]:
-    """English multi-turn trajectories: reasoning + tool calls + tool results."""
+def from_agent_deepseek(cap: int, rng: random.Random, slice_k: int = 4, min_score: float = 0.5) -> list[dict]:
+    """English multi-turn trajectories: reasoning + tool calls + tool results.
+
+    The dataset ships *prefixes*: every row with the same `id` is the same
+    conversation cut at a different assistant turn (3, 5, 7 ... messages).
+    The v4 builder deduped by `id` and kept whichever prefix came first, which
+    is the one-turn prefix -- 173 rows instead of ~1350, and none of them
+    multi-turn. Take the longest prefix per id instead: that is the whole
+    trajectory, which is then sliced at turn boundaries.
+    """
     from datasets import load_dataset
 
     ds = load_dataset(DS_AGENT, split="train")
-    rows, seen_ids = [], set()
+    best: dict[str, dict] = {}
     for row in ds:
-        if (row.get("score") or 0) < 0.66:
+        if (row.get("score") or 0) < min_score:
             continue
         if (row.get("language") or "en") != "en":
             continue
         rid = row.get("id")
-        if rid in seen_ids:  # 2510 rows / 284 ids: clones add nothing
-            continue
-        seen_ids.add(rid)
+        if rid not in best or len(row["messages"]) > len(best[rid]["messages"]):
+            best[rid] = row
+
+    rows = []
+    for row in best.values():
         if (row.get("num_turns") or 0) < 2:
             continue
 

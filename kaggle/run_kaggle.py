@@ -29,8 +29,9 @@ REPO = "https://github.com/Exo-del/supra-50m-lora.git"
 BASE_REPO = "SupraLabs/Supra-50M-Base"
 WORK = pathlib.Path("/kaggle/working")
 SRC = WORK / "repo"
-OUT = WORK / "lora_out_v4"
-DATA = SRC / "data" / "mix_v4.jsonl"
+VERSION = "v42"
+OUT = WORK / f"lora_out_{VERSION}"
+DATA = SRC / "data" / f"mix_{VERSION}.jsonl"
 
 TARGET_TOKENS = 6_000_000
 EPOCHS = 3
@@ -93,7 +94,7 @@ def main() -> int:
         "python prepare_data.py --profile kaggle "
         f"--target-tokens {TARGET_TOKENS} "
         "--slice-turns 6 --cap-per-source 20000 --val-frac 0.05 "
-        "--out data/mix_v4.jsonl"
+        "--out data/mix_v42.jsonl"
     )
 
     banner("train")
@@ -113,7 +114,7 @@ def main() -> int:
     )
 
     banner("package")
-    zip_path = WORK / "supra50m-v4-lora.zip"
+    zip_path = WORK / ("supra50m-" + VERSION + "-lora.zip")
     if zip_path.exists():
         zip_path.unlink()
     shutil.make_archive(str(zip_path.with_suffix("")), "zip", root_dir=OUT)
@@ -121,7 +122,7 @@ def main() -> int:
     print(f"adapter zip: {zip_path} ({size:.1f} MB)")
     for f in sorted(WORK.glob("*")):
         print(f"  {f.name:<40} {f.stat().st_size / 1e6:.1f} MB")
-    print("\nDONE_V4")
+    print("\nDONE_" + VERSION.upper())
     return 0
 
 

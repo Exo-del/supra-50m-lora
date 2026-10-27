@@ -129,6 +129,31 @@ def test_code_magicoder_drops_overlong_rows_instead_of_truncating():
     assert not pd.from_code_magicoder(5, random.Random(0))
 
 
+def test_agent_deepseek_takes_longest_prefix_per_id():
+    """Rows sharing an id are prefixes; keep the whole conversation, not the first turn."""
+    base = {"id": "1001", "domain": "bank", "language": "en", "score": 1.0, "num_turns": 3}
+    s = {"role": "system", "content": "You are a bank agent."}
+    u1 = {"role": "user", "content": "What is my balance?"}
+    a1 = {"role": "assistant", "content": "Let me check.", "reasoning": "Need the account id.",
+          "tool_calls": [{"function": {"name": "get_balance", "arguments": "{}"}}]}
+    t1 = {"role": "tool", "content": "{\"balance\": 42}", "name": "get_balance"}
+    u2 = {"role": "user", "content": "Thanks, and the last transaction?"}
+    a2 = {"role": "assistant", "content": "It was 12 dollars.", "reasoning": "Read the tool result."}
+
+    prefixes = [
+        {**base, "messages": [s, u1, a1]},
+        {**base, "messages": [s, u1, a1, t1, a2]},
+        {**base, "messages": [s, u1, a1, t1, a2, u2, {**a2, "content": "Anything else?"}]},
+    ]
+    fake_dataset(prefixes)
+    rows = pd.from_agent_deepseek(50, random.Random(0), slice_k=3)
+    assert rows, "agent-deepseek produced no rows"
+    turns = max(sum(1 for m in r["messages"] if m["role"] == "assistant") for r in rows)
+    assert turns >= 2, "only the one-turn prefix survived: multi-turn slice lost"
+    assert any(m.get("role") == "tool" for r in rows for m in r["messages"]), "tool results lost"
+    assert any(m.get("thinking") for r in rows for m in r["messages"]), "per-turn reasoning lost"
+
+
 def test_language_gate():
     assert canon.is_english(
         "The model predicts the next token given the context window and the prompt.")
