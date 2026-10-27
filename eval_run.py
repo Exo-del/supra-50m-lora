@@ -111,8 +111,12 @@ def main() -> int:
     def measure(model, tag):
         model.eval()
         out = {}
+        # The LM head dominates memory at vocab 32000: one 1024-token row is
+        # 32k x 1024 fp32 logits (~131 MB) before the softmax. On a 7 GB CPU
+        # box a batch of 4 overflows, so scale the batch with the device.
+        bs = 4 if device.type == "cuda" else 1
         for src, items in sample.items():
-            total, n, bs = 0.0, 0, 4
+            total, n = 0.0, 0
             for i in range(0, len(items), bs):
                 chunk = items[i: i + bs]
                 width = max(len(e[0]) for _, e in chunk)
@@ -137,6 +141,9 @@ def main() -> int:
         base = load(BASE, dtype, device)
         before = measure(base, "base")
         del base
+        import gc
+
+        gc.collect()
         if device.type == "cuda":
             torch.cuda.empty_cache()
 
